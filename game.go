@@ -55,8 +55,13 @@ func piecesMatch(p1, p2 Piece) error {
 	if len(p1.ang) != len(p2.ang) {
 		return fmt.Errorf("Error: Angles do not match. p1: (%v), p2: (%v)", p1, p2)
 	}
-
-	// NOTE: program bugs may occur if ang values are not ordered!
+	// Return error if angles are not ordered.
+	if slices.IsSorted(p1.ang) {
+		return fmt.Errorf("Error: Angles in p1 are not sorted in order: %v", p1)
+	}
+	if slices.IsSorted(p2.ang) {
+		return fmt.Errorf("Error: Angles in p2 are not sorted in order: %v", p2)
+	}
 
 	// Iterate over shift values 0 to 5
 	for i := uint8(0); i < 6; i++ {
@@ -79,9 +84,6 @@ func piecesMatch(p1, p2 Piece) error {
 
 // Given Coordinate and angle, finds all spaces forward.
 func (b *Board) getSpacesInRow(c Coord, ang uint8) (output []Coord, err error) {
-	if !b.posExists(c) {
-		return nil, fmt.Errorf("Error: Invalid position. (%d, %d) doesn't exist on board", c.x, c.y)
-	}
 
 	var xs, ys []uint8
 
@@ -137,56 +139,58 @@ func (b *Board) getSpacesInRow(c Coord, ang uint8) (output []Coord, err error) {
 	return output, nil
 }
 
-// Checks what pieces are in the moves path and returns available moves
-func (b *Board) getLegalMoves(moves []Coord, myCol bool) []Coord {
-	for i, move := range moves {
-		if len(b[move.x][move.y].ang) != 0 {
-			if b[move.x][move.y].col == myCol {
-				return moves[:i]
-			} else {
-				return moves[:i+1]
+// Accepts Coord and angle direction
+func (b *Board) getLegalMoves(c Coord) (output []Coord, err error) {
+	output = []Coord{}
+	p, ok := b[c.x][c.y]
+	if !ok {
+		return nil, fmt.Errorf("Error: Invalid position. (%d, %d) doesn't exist on board", c.x, c.y)
+	}
+
+	// Iterate over available angle of the piece.
+	for _, a := range p.ang {
+		pFound := false
+		moves, gErr := b.getSpacesInRow(c, a)
+		if gErr != nil {
+			return nil, gErr
+		}
+		// Iterate over moves
+		for i, move := range moves {
+			// If the space is not empty
+			if len(b[move.x][move.y].ang) != 0 {
+				pFound = true
+				// If the colors match
+				if b[move.x][move.y].col == p.col {
+					output = append(output, moves[:i]...)
+				} else {
+					output = append(output, moves[:i+1]...)
+				}
+				break
 			}
 		}
+		// If the entire move path was empty
+		if !pFound {
+			output = append(output, moves...)
+		}
 	}
-	return moves
+	return output, nil
 }
 
 // Accepts Coord of piece before and after, the movement angle, and the final Piece state.
-func (b *Board) Move(c1 Coord, mAng uint8, c2 Coord, p2 Piece) error {
+func (b *Board) Move(c1 Coord, c2 Coord, p2 Piece) error {
 
-	// Error checking
-
-	// Check validity of coordinates
-	if !b.posExists(c1) {
-		return fmt.Errorf("Error: Invalid position. c1 (%d, %d) doesn't exist on board", c1.x, c1.y)
-	}
-	if !b.posExists(c2) {
-		return fmt.Errorf("Error: Invalid position. c2 (%d, %d) doesn't exist on board", c2.x, c2.y)
-	}
-
-	p1 := b[c1.x][c1.y]
-
-	// Check if piece moved matches original piece
-	err := piecesMatch(p1, p2)
+	moves, err := b.getLegalMoves(c1)
 	if err != nil {
 		return err
 	}
-
-	// check if angle of movement is valid
-	if !slices.Contains(p1.ang, mAng) {
-		return nil
-	}
-
-	// Search for valid moves
-
-	moves, err := b.getSpacesInRow(c1, mAng)
-	if err != nil {
-		return err
-	}
-	moves = b.getLegalMoves(moves, p2.col)
 
 	if !slices.Contains(moves, c2) {
-		return fmt.Errorf("Error: Invalid move!")
+		return fmt.Errorf("Error: Position (%d, %d) is not in the list of legal moves: %v", c2.x, c2.y, moves)
+	}
+	// Check if piece moved matches original piece
+	err = piecesMatch(b[c1.x][c1.y], p2)
+	if err != nil {
+		return err
 	}
 
 	// Set board with new move
@@ -201,12 +205,11 @@ func main() {
 
 	board := MakeBoard()
 
-	board[7][1] = Piece{true, []uint8{33}}
+	myCoord := Coord{4, 4}
 
-	moves, err := board.getSpacesInRow(Coord{4, 4}, 0)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(board.getLegalMoves(moves, true))
+	board[myCoord.x][myCoord.y] = Piece{true, []uint8{5}}
+
+	//fmt.Println(board[myCoord.x][myCoord.y])
+	fmt.Println(board.getLegalMoves(myCoord))
 
 }
