@@ -16,18 +16,32 @@ type Piece struct {
 
 type Board [9]map[uint8]Piece
 
-// Init empty board
-func MakeBoard() Board {
-	return Board{
-		{4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
-		{3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
-		{2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
-		{1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
-		{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
-		{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}},
-		{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}},
-		{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}},
-		{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}},
+// Init board. True for empty, false for setup.
+func SetupBoard(empty bool) Board {
+	if empty {
+		return Board{
+			{4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}},
+		}
+	} else {
+		return Board{
+			{4: Piece{true, []uint8{1, 4}}, 5: Piece{true, []uint8{2}}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{3: Piece{true, []uint8{1, 3, 5}}, 4: Piece{true, []uint8{2}}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{2: Piece{true, []uint8{1, 2}}, 3: Piece{true, []uint8{2}}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{1: Piece{true, []uint8{0, 1, 2, 3, 4, 5}}, 2: Piece{true, []uint8{1}}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{false, []uint8{4}}},
+			{0: Piece{true, []uint8{2, 5}}, 1: Piece{true, []uint8{1}}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{false, []uint8{4}}, 8: Piece{false, []uint8{2, 5}}},
+			{0: Piece{}, 1: Piece{true, []uint8{1}}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{false, []uint8{4}}, 7: Piece{false, []uint8{1, 3, 5}}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{false, []uint8{5}}, 6: Piece{false, []uint8{4, 5}}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{false, []uint8{5}}, 5: Piece{false, []uint8{0, 1, 2, 3, 4, 5}}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{false, []uint8{5}}, 4: Piece{false, []uint8{1, 4}}},
+		}
 	}
 }
 
