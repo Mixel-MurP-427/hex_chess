@@ -1,4 +1,4 @@
-package main
+package hexchess
 
 import (
 	"fmt"
@@ -13,6 +13,8 @@ type Piece struct {
 	col bool    // Color: true represents self, false represents opponent.
 	ang []uint8 // Angle: Slice of any values 0 to 5. Must be in order.
 }
+
+type KingPos [3]Coord
 
 type Board [9]map[uint8]Piece
 
@@ -37,7 +39,7 @@ func SetupBoard(empty bool) Board {
 			{2: Piece{true, []uint8{1, 2}}, 3: Piece{true, []uint8{2}}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
 			{1: Piece{true, []uint8{0, 1, 2, 3, 4, 5}}, 2: Piece{true, []uint8{1}}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{false, []uint8{4}}},
 			{0: Piece{true, []uint8{2, 5}}, 1: Piece{true, []uint8{1}}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{false, []uint8{4}}, 8: Piece{false, []uint8{2, 5}}},
-			{0: Piece{}, 1: Piece{true, []uint8{1}}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{false, []uint8{4}}, 7: Piece{false, []uint8{1, 3, 5}}},
+			{0: Piece{true, []uint8{1}}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{false, []uint8{4}}, 7: Piece{false, []uint8{1, 3, 5}}},
 			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{false, []uint8{5}}, 6: Piece{false, []uint8{4, 5}}},
 			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{false, []uint8{5}}, 5: Piece{false, []uint8{0, 1, 2, 3, 4, 5}}},
 			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{false, []uint8{5}}, 4: Piece{false, []uint8{1, 4}}},
@@ -213,17 +215,63 @@ func (b *Board) Move(c1 Coord, c2 Coord, p2 Piece) error {
 	return nil
 }
 
-// Code for testing
-func main() {
-	fmt.Println("Hello!")
+// Return whether or not the king is in check
+func (b *Board) Check(kPos KingPos, kCol bool) (bool, error) {
+	// Trace from the king outward to find if threats are in his path.
 
-	board := MakeBoard()
-
-	myCoord := Coord{4, 4}
-
-	board[myCoord.x][myCoord.y] = Piece{true, []uint8{5}}
-
-	//fmt.Println(board[myCoord.x][myCoord.y])
-	fmt.Println(board.getLegalMoves(myCoord))
-
+	// Iterate over the king's neighboring spaces
+	for _, space := range kPos {
+		// Continue if an enemy piece sits in this space.
+		if len(b[space.x][space.y].ang) != 0 && b[space.x][space.y].col != kCol {
+			continue
+		}
+		// Iterate over all six directions
+		for a := uint8(0); a < 6; a++ {
+			// Continue if the adjacent space does not also border the king.
+			switch a {
+			case 0:
+				if !slices.Contains(kPos[:], Coord{space.x + 1, space.y - 1}) {
+					continue
+				}
+			case 1:
+				if !slices.Contains(kPos[:], Coord{space.x + 1, space.y}) {
+					continue
+				}
+			case 2:
+				if !slices.Contains(kPos[:], Coord{space.x, space.y + 1}) {
+					continue
+				}
+			case 3:
+				if !slices.Contains(kPos[:], Coord{space.x - 1, space.y + 1}) {
+					continue
+				}
+			case 4:
+				if !slices.Contains(kPos[:], Coord{space.x - 1, space.y}) {
+					continue
+				}
+			case 5:
+				if !slices.Contains(kPos[:], Coord{space.x, space.y - 1}) {
+					continue
+				}
+			}
+			moves, err := b.getSpacesInRow(space, a)
+			if err != nil {
+				return false, err
+			}
+			for _, move := range moves {
+				p := b[move.x][move.y]
+				// If there is a piece here
+				if len(p.ang) != 0 {
+					// If it is an enemy piece pointing at the king
+					if p.col != kCol && slices.Contains(p.ang, (a+3)%6) {
+						// Check situation found!
+						return true, nil
+					}
+					// Do not check the pieces behind this one.
+					break
+				}
+			}
+		}
+	}
+	return false, nil
 }
