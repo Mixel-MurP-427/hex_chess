@@ -211,6 +211,7 @@ func (b *Board) Move(c1 Coord, c2 Coord, p2 Piece) error {
 
 	// Set board with new move
 	b[c1.x][c1.y] = Piece{}
+	b[c2.x][c2.y] = p2
 
 	return nil
 }
