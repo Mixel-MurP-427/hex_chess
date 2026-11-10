@@ -74,18 +74,6 @@ func (b *Board) posExists(c Coord) bool {
 	return false
 }
 
-func validateAngles(angles []uint8) error {
-	for i, angle := range angles {
-		if angle > 5 {
-			return fmt.Errorf("invalid angle in %v: angles must be between 0 and 5", angles)
-		}
-		if i > 0 && angles[i-1] > angle {
-			return fmt.Errorf("invalid angles %v: angles must be unique and sorted", angles)
-		}
-	}
-	return nil
-}
-
 func rotatePiece(piece Piece, steps uint8) Piece {
 	rotated := Piece{col: piece.col, ang: make([]uint8, len(piece.ang))}
 	for i, angle := range piece.ang {
@@ -93,39 +81,6 @@ func rotatePiece(piece Piece, steps uint8) Piece {
 	}
 	slices.Sort(rotated.ang)
 	return rotated
-}
-
-func piecesMatch(p1, p2 Piece) error {
-	// Return error if either piece is empty
-	if len(p1.ang) == 0 {
-		return fmt.Errorf("Error: Piece p1 (%v) cannot be empty.", p1)
-	}
-	if len(p2.ang) == 0 {
-		return fmt.Errorf("Error: Piece p2 (%v) cannot be empty.", p2)
-	}
-	// Return error if colors do not match.
-	if p1.col != p2.col {
-		return fmt.Errorf("Error: Pieces do not have matching color: (%t), (%t)", p1.col, p2.col)
-	}
-	// Return error if number of angles do not match
-	if len(p1.ang) != len(p2.ang) {
-		return fmt.Errorf("Error: Angles do not match. p1: (%v), p2: (%v)", p1, p2)
-	}
-	if err := validateAngles(p1.ang); err != nil {
-		return fmt.Errorf("invalid p1 angles: %w", err)
-	}
-	if err := validateAngles(p2.ang); err != nil {
-		return fmt.Errorf("invalid p2 angles: %w", err)
-	}
-
-	// Iterate over shift values 0 to 5
-	for i := uint8(0); i < 6; i++ {
-		rotated := rotatePiece(p2, i)
-		if slices.Equal(p1.ang, rotated.ang) {
-			return nil
-		}
-	}
-	return fmt.Errorf("Error: Angles do not match. p1: (%v), p2: (%v)", p1, p2)
 }
 
 // Given Coordinate and angle, finds all spaces forward.
@@ -224,7 +179,11 @@ func (b *Board) getLegalMoves(c Coord) (output []Coord, err error) {
 
 // Accepts Coord of piece before and after, the movement angle, and the final Piece state.
 // TODO instead of inputing p2, input a rotation amount 0-5
-func (b *Board) Move(c1 Coord, c2 Coord, p2 Piece) error {
+func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
+
+	if rotation > 5 {
+		return fmt.Errorf("invalid rotation %d: must be between 0 and 5", rotation)
+	}
 
 	moves, err := b.getLegalMoves(c1)
 	if err != nil {
@@ -234,15 +193,10 @@ func (b *Board) Move(c1 Coord, c2 Coord, p2 Piece) error {
 	if !slices.Contains(moves, c2) {
 		return fmt.Errorf("Error: Position (%d, %d) is not in the list of legal moves: %v", c2.x, c2.y, moves)
 	}
-	// Check if piece moved matches original piece
-	err = piecesMatch(b[c1.x][c1.y], p2)
-	if err != nil {
-		return err
-	}
 
 	// Set board with new move
+	b[c2.x][c2.y] = rotatePiece(b[c1.x][c1.y], rotation)
 	b[c1.x][c1.y] = Piece{}
-	b[c2.x][c2.y] = p2
 
 	return nil
 }

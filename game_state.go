@@ -16,17 +16,6 @@ func cloneBoard(board Board) Board {
 	return cloned
 }
 
-func (b *Board) MoveWithRotation(from, to Coord, rotation uint8) error {
-	if rotation > 5 {
-		return fmt.Errorf("invalid rotation %d: must be between 0 and 5", rotation)
-	}
-	piece, ok := b[from.x][from.y]
-	if !ok || len(piece.ang) == 0 {
-		return fmt.Errorf("no piece at (%d, %d)", from.x, from.y)
-	}
-	return b.Move(from, to, rotatePiece(piece, rotation))
-}
-
 var kingDirections = [6][2]int{
 	{1, -1}, {1, 0}, {0, 1}, {-1, 1}, {-1, 0}, {0, -1},
 }
