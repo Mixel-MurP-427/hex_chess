@@ -16,6 +16,11 @@ type Piece struct {
 
 type KingPos [3]Coord
 
+var (
+	tKStart = KingPos{Coord{2, 2}, Coord{3, 2}, Coord{2, 3}}
+	fKStart = KingPos{Coord{6, 6}, Coord{5, 6}, Coord{6, 5}}
+)
+
 type Board [9]map[uint8]Piece
 
 // Init board. True for empty, false for setup.
@@ -47,6 +52,7 @@ func SetupBoard(empty bool) Board {
 	}
 }
 
+// TODO change so that it compares numbers instead of checking the actual board. This will faulty additions to the board.
 func (b *Board) posExists(c Coord) bool {
 	_, exists := b[c.x][c.y]
 	if exists {
@@ -71,27 +77,17 @@ func piecesMatch(p1, p2 Piece) error {
 	if len(p1.ang) != len(p2.ang) {
 		return fmt.Errorf("Error: Angles do not match. p1: (%v), p2: (%v)", p1, p2)
 	}
-	// Return error if angles are not ordered.
-	if slices.IsSorted(p1.ang) {
-		return fmt.Errorf("Error: Angles in p1 are not sorted in order: %v", p1)
+	if err := validateAngles(p1.ang); err != nil {
+		return fmt.Errorf("invalid p1 angles: %w", err)
 	}
-	if slices.IsSorted(p2.ang) {
-		return fmt.Errorf("Error: Angles in p2 are not sorted in order: %v", p2)
+	if err := validateAngles(p2.ang); err != nil {
+		return fmt.Errorf("invalid p2 angles: %w", err)
 	}
 
 	// Iterate over shift values 0 to 5
 	for i := uint8(0); i < 6; i++ {
-		// Assume true until inequality is found
-		output := true
-		// Iterate over items in angle slices
-		for j := 0; j < len(p1.ang); j++ {
-			// Shift (rotate) p2 angles by 1 at a time and see if they match p1.
-			if p1.ang[j] != (p2.ang[j]+i)%6 {
-				output = false
-				break
-			}
-		}
-		if output == true {
+		rotated := rotatePiece(p2, i)
+		if slices.Equal(p1.ang, rotated.ang) {
 			return nil
 		}
 	}
@@ -193,6 +189,7 @@ func (b *Board) getLegalMoves(c Coord) (output []Coord, err error) {
 }
 
 // Accepts Coord of piece before and after, the movement angle, and the final Piece state.
+// TODO instead of inputing p2, input a rotation amount 0-5
 func (b *Board) Move(c1 Coord, c2 Coord, p2 Piece) error {
 
 	moves, err := b.getLegalMoves(c1)

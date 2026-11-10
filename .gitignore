@@ -1,2 +1,4 @@
 .vscode
 print_test.go
+*.py
+*.txt
