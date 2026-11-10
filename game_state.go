@@ -5,15 +5,6 @@ import (
 	"slices"
 )
 
-func rotatePiece(piece Piece, steps uint8) Piece {
-	rotated := Piece{col: piece.col, ang: make([]uint8, len(piece.ang))}
-	for i, angle := range piece.ang {
-		rotated.ang[i] = (angle + steps) % 6
-	}
-	slices.Sort(rotated.ang)
-	return rotated
-}
-
 func cloneBoard(board Board) Board {
 	var cloned Board
 	for x, row := range board {
@@ -23,18 +14,6 @@ func cloneBoard(board Board) Board {
 		}
 	}
 	return cloned
-}
-
-func validateAngles(angles []uint8) error {
-	for i, angle := range angles {
-		if angle > 5 {
-			return fmt.Errorf("invalid angle %d: angles must be between 0 and 5", angle)
-		}
-		if i > 0 && angles[i-1] >= angle {
-			return fmt.Errorf("invalid angles %v: angles must be unique and sorted", angles)
-		}
-	}
-	return nil
 }
 
 func (b *Board) MoveWithRotation(from, to Coord, rotation uint8) error {

@@ -54,11 +54,45 @@ func SetupBoard(empty bool) Board {
 
 // TODO change so that it compares numbers instead of checking the actual board. This will faulty additions to the board.
 func (b *Board) posExists(c Coord) bool {
-	_, exists := b[c.x][c.y]
-	if exists {
-		return true
+	// Must be between 0 and 8
+	if c.x >= 9 || c.y >= 9 {
+		return false
 	}
+	if c.x <= 4 {
+		if c.y >= 4-c.x {
+			return true
+		}
+	} else {
+		if c.y <= 12-c.x {
+			return true
+		}
+	}
+	// _, exists := b[c.x][c.y]
+	// if exists {
+	// 	return true
+	// }
 	return false
+}
+
+func validateAngles(angles []uint8) error {
+	for i, angle := range angles {
+		if angle > 5 {
+			return fmt.Errorf("invalid angle in %v: angles must be between 0 and 5", angles)
+		}
+		if i > 0 && angles[i-1] > angle {
+			return fmt.Errorf("invalid angles %v: angles must be unique and sorted", angles)
+		}
+	}
+	return nil
+}
+
+func rotatePiece(piece Piece, steps uint8) Piece {
+	rotated := Piece{col: piece.col, ang: make([]uint8, len(piece.ang))}
+	for i, angle := range piece.ang {
+		rotated.ang[i] = (angle + steps) % 6
+	}
+	slices.Sort(rotated.ang)
+	return rotated
 }
 
 func piecesMatch(p1, p2 Piece) error {
@@ -272,4 +306,8 @@ func (b *Board) Check(kPos KingPos, kCol bool) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (k *KingPos) MoveKing(newC Coord) error {
+	return nil
 }
