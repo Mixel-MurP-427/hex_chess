@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	address := flag.String("addr", "127.0.0.1:8080", "local address to serve the game on")
+	address := flag.String("addr", "127.0.0.1:8072", "local address to serve the game on")
 	flag.Parse()
 
 	server := &http.Server{
