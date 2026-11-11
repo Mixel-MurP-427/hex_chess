@@ -1,5 +1,7 @@
 package hexchess
 
+import "math/bits"
+
 const (
 	pScore     int16 = 1   // Each piece gets pScore points per angle it has.
 	checkScore int16 = 8   // Additional score if piece is in check
@@ -16,9 +18,9 @@ func (b *Board) getScore(color bool, trueKing, falseKing KingNeighbors) (score i
 	for _, row := range b {
 		for _, space := range row {
 			if space.col {
-				score += int16(len(space.ang)) * pScore
+				score += int16(bits.OnesCount8(space.ang)) * pScore
 			} else {
-				score -= int16(len(space.ang)) * pScore
+				score -= int16(bits.OnesCount8(space.ang)) * pScore
 			}
 		}
 	}

@@ -2,6 +2,7 @@ package hexchess
 
 import (
 	"fmt"
+	"math/bits"
 	"slices"
 )
 
@@ -10,8 +11,8 @@ type Coord struct {
 	y uint8
 }
 type Piece struct {
-	col bool    // Color: true represents self, false represents opponent.
-	ang []uint8 // Angle: Slice of any values 0 to 5. Must be in order.
+	col bool  // Color: true represents self, false represents opponent.
+	ang uint8 // Angle: represents a list of direction values 0 to 5, where each bit tells whether that direction is in the list. Bits 7 and 8 are ignored.
 }
 
 // If ontop, the king sits directly on top of coord. Else, it directly below coord.
@@ -44,15 +45,15 @@ func SetupBoard(empty bool) Board {
 		}
 	} else {
 		return Board{
-			{4: Piece{true, []uint8{1, 4}}, 5: Piece{true, []uint8{2}}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
-			{3: Piece{true, []uint8{1, 3, 5}}, 4: Piece{true, []uint8{2}}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
-			{2: Piece{true, []uint8{1, 2}}, 3: Piece{true, []uint8{2}}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
-			{1: Piece{true, []uint8{0, 1, 2, 3, 4, 5}}, 2: Piece{true, []uint8{1}}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{false, []uint8{4}}},
-			{0: Piece{true, []uint8{2, 5}}, 1: Piece{true, []uint8{1}}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{false, []uint8{4}}, 8: Piece{false, []uint8{2, 5}}},
-			{0: Piece{true, []uint8{1}}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{false, []uint8{4}}, 7: Piece{false, []uint8{1, 3, 5}}},
-			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{false, []uint8{5}}, 6: Piece{false, []uint8{4, 5}}},
-			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{false, []uint8{5}}, 5: Piece{false, []uint8{0, 1, 2, 3, 4, 5}}},
-			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{false, []uint8{5}}, 4: Piece{false, []uint8{1, 4}}},
+			{4: Piece{true, 18}, 5: Piece{true, 4}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{3: Piece{true, 42}, 4: Piece{true, 4}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{2: Piece{true, 6}, 3: Piece{true, 4}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{}},
+			{1: Piece{true, 63}, 2: Piece{true, 2}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{}, 8: Piece{false, 16}},
+			{0: Piece{true, 36}, 1: Piece{true, 2}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{}, 7: Piece{false, 16}, 8: Piece{false, 36}},
+			{0: Piece{true, 2}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{}, 6: Piece{false, 16}, 7: Piece{false, 42}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{}, 5: Piece{false, 32}, 6: Piece{false, 48}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{}, 4: Piece{false, 32}, 5: Piece{false, 63}},
+			{0: Piece{}, 1: Piece{}, 2: Piece{}, 3: Piece{false, 32}, 4: Piece{false, 18}},
 		}
 	}
 }
@@ -62,7 +63,7 @@ func (board *Board) clone() Board {
 	for x, row := range board {
 		cloned[x] = make(map[uint8]Piece, len(row))
 		for y, piece := range row {
-			cloned[x][y] = Piece{col: piece.col, ang: slices.Clone(piece.ang)}
+			cloned[x][y] = piece
 		}
 	}
 	return cloned
@@ -90,13 +91,8 @@ func posExists(c Coord) bool {
 	return false
 }
 
-func rotatePiece(piece Piece, steps uint8) Piece {
-	rotated := Piece{col: piece.col, ang: make([]uint8, len(piece.ang))}
-	for i, angle := range piece.ang {
-		rotated.ang[i] = (angle + steps) % 6
-	}
-	slices.Sort(rotated.ang)
-	return rotated
+func rotatePiece(piece Piece, steps int) Piece {
+	return Piece{piece.col, bits.RotateLeft8(piece.ang, steps)}
 }
 
 // Given Coordinate and angle, finds all spaces forward.
@@ -165,16 +161,20 @@ func (b *Board) getLegalMoves(c Coord) (output []Coord, err error) {
 	}
 
 	// Iterate over available angle of the piece.
-	for _, a := range p.ang {
+	for q := range uint8(6) {
+		// If angle q is not one of the angles
+		if (p.ang>>q)&1 == 0 {
+			continue
+		}
 		pFound := false
-		moves, gErr := b.getSpacesInRow(c, a)
+		moves, gErr := b.getSpacesInRow(c, q)
 		if gErr != nil {
 			return nil, gErr
 		}
 		// Iterate over moves
 		for i, move := range moves {
 			// If the space is not empty
-			if len(b[move.x][move.y].ang) != 0 {
+			if b[move.x][move.y].ang != 0 {
 				pFound = true
 				// If the colors match
 				if b[move.x][move.y].col == p.col {
@@ -195,7 +195,7 @@ func (b *Board) getLegalMoves(c Coord) (output []Coord, err error) {
 
 // Accepts Coord of piece before and after, the movement angle, and the final Piece state.
 // TODO instead of inputing p2, input a rotation amount 0-5
-func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
+func (b *Board) Move(c1 Coord, c2 Coord, rotation int) error {
 
 	if rotation > 5 {
 		return fmt.Errorf("invalid rotation %d: must be between 0 and 5", rotation)
@@ -224,7 +224,7 @@ func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
 	// Iterate over the king's neighboring spaces
 	for _, space := range kN {
 		// Continue if an enemy piece sits in this space.
-		if len(b[space.x][space.y].ang) != 0 && b[space.x][space.y].col != kCol {
+		if b[space.x][space.y].ang != 0 && b[space.x][space.y].col != kCol {
 			continue
 		}
 		// Iterate over all six directions
@@ -263,9 +263,9 @@ func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
 			for _, move := range moves {
 				p := b[move.x][move.y]
 				// If there is a piece here
-				if len(p.ang) != 0 {
+				if p.ang != 0 {
 					// If it is an enemy piece pointing at the king
-					if p.col != kCol && slices.Contains(p.ang, (a+3)%6) {
+					if p.col != kCol && (p.ang>>((a+3)%6))&1 == 1 { // get the ((a+3)%6)th bit (opposite direction of var a) and check if == 1
 						// Check situation found!
 						return true, nil
 					}

@@ -123,7 +123,9 @@ function drawPiece(position, piece, isStaged = false) {
     group.append(svgElement("circle", { r: 19, class: "staged-outline" }));
   }
   group.append(svgElement("circle", { r: 12 }));
-  for (const angle of piece.angles) {
+  for (let angle = 0; angle < 6; angle++) {
+    // Iterate over only the available angle of the piece.
+    if ((piece.angles>>angle)&1 == 0) {continue;}
     const [dx, dy] = DIRECTIONS[angle];
     group.append(svgElement("line", {
       x1: 0, y1: 0, x2: dx * 23, y2: dy * 23, class: "ray",

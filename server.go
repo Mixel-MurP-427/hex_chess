@@ -22,8 +22,8 @@ type jsonCoordinate struct {
 }
 
 type pieceJSON struct {
-	Color  bool    `json:"color"`
-	Angles []uint8 `json:"angles"`
+	Color  bool  `json:"color"`
+	Angles uint8 `json:"angles"`
 }
 
 type squareJSON struct {
@@ -58,7 +58,7 @@ type clientMessage struct {
 	Type     string           `json:"type"`
 	From     jsonCoordinate   `json:"from"`
 	To       jsonCoordinate   `json:"to"`
-	Rotation uint8            `json:"rotation"`
+	Rotation int              `json:"rotation"`
 	King     []jsonCoordinate `json:"king"`
 }
 
@@ -152,10 +152,8 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		slices.Sort(ys)
 		for _, rawY := range ys {
 			piece := row[uint8(rawY)]
-			angles := slices.Clone(piece.ang)
-			if angles == nil {
-				angles = []uint8{}
-			}
+			angles := piece.ang
+
 			state.Board = append(state.Board, squareJSON{
 				Position: jsonCoordinate{X: uint8(x), Y: uint8(rawY)},
 				Piece: pieceJSON{
@@ -163,7 +161,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 					Angles: angles,
 				},
 			})
-			if len(piece.ang) == 0 || piece.col != s.turn {
+			if piece.ang == 0 || piece.col != s.turn {
 				continue
 			}
 			moves, err := s.board.getLegalMoves(Coord{uint8(x), uint8(rawY)})
@@ -226,7 +224,7 @@ func (s *gameServer) process(message clientMessage) error {
 			break
 		}
 		piece := s.board[from.x][from.y]
-		if len(piece.ang) == 0 {
+		if piece.ang == 0 {
 			err = errors.New("there is no piece at the selected vertex")
 			break
 		}

@@ -28,7 +28,7 @@ func (b *Board) printBoard() {
 		for j, space := range spaces {
 			p := b[space.x][space.y]
 
-			if len(p.ang) == 0 {
+			if p.ang == 0 {
 				pb[i][j] = 3
 				continue
 			}
