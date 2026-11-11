@@ -14,11 +14,16 @@ type Piece struct {
 	ang []uint8 // Angle: Slice of any values 0 to 5. Must be in order.
 }
 
-type KingPos [3]Coord
+// If ontop, the king sits directly on top of coord. Else, it directly below coord.
+type KingPos struct {
+	coord Coord
+	ontop bool
+}
+type KingNeighbors [3]Coord
 
 var (
-	tKStart = KingPos{Coord{2, 2}, Coord{3, 2}, Coord{2, 3}}
-	fKStart = KingPos{Coord{6, 6}, Coord{5, 6}, Coord{6, 5}}
+	tKStart = KingPos{Coord{2, 2}, true}
+	fKStart = KingPos{Coord{6, 6}, false}
 )
 
 type Board [9]map[uint8]Piece
@@ -52,8 +57,19 @@ func SetupBoard(empty bool) Board {
 	}
 }
 
+func (board *Board) clone() Board {
+	var cloned Board
+	for x, row := range board {
+		cloned[x] = make(map[uint8]Piece, len(row))
+		for y, piece := range row {
+			cloned[x][y] = Piece{col: piece.col, ang: slices.Clone(piece.ang)}
+		}
+	}
+	return cloned
+}
+
 // TODO change so that it compares numbers instead of checking the actual board. This will faulty additions to the board.
-func (b *Board) posExists(c Coord) bool {
+func posExists(c Coord) bool {
 	// Must be between 0 and 8
 	if c.x >= 9 || c.y >= 9 {
 		return false
@@ -132,7 +148,7 @@ func (b *Board) getSpacesInRow(c Coord, ang uint8) (output []Coord, err error) {
 	// Filter or append valid positions
 	for idx := range xs {
 		i, j := xs[idx], ys[idx]
-		if b.posExists(Coord{i, j}) {
+		if posExists(Coord{i, j}) {
 			output = append(output, Coord{i, j})
 		}
 	}
@@ -202,11 +218,11 @@ func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 }
 
 // Return whether or not the king is in check
-func (b *Board) Check(kPos KingPos, kCol bool) (bool, error) {
+func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
 	// Trace from the king outward to find if threats are in his path.
 
 	// Iterate over the king's neighboring spaces
-	for _, space := range kPos {
+	for _, space := range kN {
 		// Continue if an enemy piece sits in this space.
 		if len(b[space.x][space.y].ang) != 0 && b[space.x][space.y].col != kCol {
 			continue
@@ -216,27 +232,27 @@ func (b *Board) Check(kPos KingPos, kCol bool) (bool, error) {
 			// Continue if the adjacent space does not also border the king.
 			switch a {
 			case 0:
-				if !slices.Contains(kPos[:], Coord{space.x + 1, space.y - 1}) {
+				if !slices.Contains(kN[:], Coord{space.x + 1, space.y - 1}) {
 					continue
 				}
 			case 1:
-				if !slices.Contains(kPos[:], Coord{space.x + 1, space.y}) {
+				if !slices.Contains(kN[:], Coord{space.x + 1, space.y}) {
 					continue
 				}
 			case 2:
-				if !slices.Contains(kPos[:], Coord{space.x, space.y + 1}) {
+				if !slices.Contains(kN[:], Coord{space.x, space.y + 1}) {
 					continue
 				}
 			case 3:
-				if !slices.Contains(kPos[:], Coord{space.x - 1, space.y + 1}) {
+				if !slices.Contains(kN[:], Coord{space.x - 1, space.y + 1}) {
 					continue
 				}
 			case 4:
-				if !slices.Contains(kPos[:], Coord{space.x - 1, space.y}) {
+				if !slices.Contains(kN[:], Coord{space.x - 1, space.y}) {
 					continue
 				}
 			case 5:
-				if !slices.Contains(kPos[:], Coord{space.x, space.y - 1}) {
+				if !slices.Contains(kN[:], Coord{space.x, space.y - 1}) {
 					continue
 				}
 			}
@@ -262,6 +278,70 @@ func (b *Board) Check(kPos KingPos, kCol bool) (bool, error) {
 	return false, nil
 }
 
-func (k *KingPos) MoveKing(newC Coord) error {
+func (k *KingPos) getKingNeighbors() KingNeighbors {
+	if k.ontop {
+		return KingNeighbors{k.coord, Coord{k.coord.x, k.coord.y + 1}, Coord{k.coord.x + 1, k.coord.y}}
+	} else {
+		return KingNeighbors{k.coord, Coord{k.coord.x, k.coord.y - 1}, Coord{k.coord.x - 1, k.coord.y}}
+	}
+}
+
+// Determines the king position is valid
+func (n *KingNeighbors) validKingNeighbors() bool {
+	if posExists(n[0]) && posExists(n[1]) && posExists(n[2]) {
+		return true
+	} else {
+		return false
+	}
+}
+
+// Get the locations where the king can move on the board
+func (k *KingPos) getMoves() (moves []Coord) {
+	// Get available adjacent moves
+	if k.ontop {
+		moves = []Coord{{k.coord.x, k.coord.y + 1}, {k.coord.x + 1, k.coord.y}, {k.coord.x + 1, k.coord.y + 1}}
+	} else {
+		moves = []Coord{{k.coord.x, k.coord.y - 1}, {k.coord.x - 1, k.coord.y}, {k.coord.x - 1, k.coord.y - 1}}
+	}
+
+	// Validate that these moves lie on the board
+	keepIndex := 0
+	// Sort moves and only return valid ones
+	for _, move := range moves {
+		newK := KingPos{move, !k.ontop}
+		newN := newK.getKingNeighbors()
+		if newN.validKingNeighbors() {
+			moves[keepIndex] = move
+			keepIndex++
+		}
+	}
+	return moves[:keepIndex]
+}
+
+func (k1 *KingPos) Move(b *Board, k2 KingPos, kCol bool) error {
+	// Get neighbors and validate
+	n1 := k1.getKingNeighbors()
+	if !n1.validKingNeighbors() {
+		return fmt.Errorf("Error: Invalid king location: (%v) not on board.", k1)
+	}
+	n2 := k2.getKingNeighbors()
+	if !n2.validKingNeighbors() {
+		return fmt.Errorf("Error: Invalid king location: (%v) not on board.", k2)
+	}
+
+	// Check if this move is to an adjacent triangle
+	if !slices.Contains(k1.getMoves(), k2.coord) {
+		return fmt.Errorf("Error: Invalid king move from (%v) to (%v).", k1, k2)
+	}
+
+	isCheck, err := b.Check(n2, kCol)
+	if err != nil {
+		return err
+	}
+	if isCheck {
+		return fmt.Errorf("Cannot move king at (%v) to (%v) because it would result in check.", k1, k2)
+	}
+	// Move the king
+
 	return nil
 }

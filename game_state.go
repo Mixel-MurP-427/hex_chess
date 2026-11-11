@@ -5,17 +5,6 @@ import (
 	"slices"
 )
 
-func cloneBoard(board Board) Board {
-	var cloned Board
-	for x, row := range board {
-		cloned[x] = make(map[uint8]Piece, len(row))
-		for y, piece := range row {
-			cloned[x][y] = Piece{col: piece.col, ang: slices.Clone(piece.ang)}
-		}
-	}
-	return cloned
-}
-
 var kingDirections = [6][2]int{
 	{1, -1}, {1, 0}, {0, 1}, {-1, 1}, {-1, 0}, {0, -1},
 }
@@ -153,7 +142,7 @@ func (b *Board) KingMovesAgainst(position KingPos, color bool, opponent KingPos)
 	return safeMoves, nil
 }
 
-func (b *Board) MoveKing(current, next KingPos, color bool) error {
+func (b *Board) MoveDaKing(current, next KingPos, color bool) error {
 	moves, err := b.KingMoves(current, color)
 	if err != nil {
 		return err
