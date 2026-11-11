@@ -16,7 +16,7 @@ import (
 //go:embed web
 var webAssets embed.FS
 
-type coordinateJSON struct {
+type jsonCoordinate struct {
 	X uint8 `json:"x"`
 	Y uint8 `json:"y"`
 }
@@ -27,16 +27,16 @@ type pieceJSON struct {
 }
 
 type squareJSON struct {
-	Position coordinateJSON `json:"position"`
+	Position jsonCoordinate `json:"position"`
 	Piece    pieceJSON      `json:"piece"`
 }
 
 type sourceMovesJSON struct {
-	From coordinateJSON   `json:"from"`
-	To   []coordinateJSON `json:"to"`
+	From jsonCoordinate   `json:"from"`
+	To   []jsonCoordinate `json:"to"`
 }
 
-type kingPositionJSON [3]coordinateJSON
+type kingPositionJSON [3]jsonCoordinate
 
 type stateJSON struct {
 	Type           string             `json:"type"`
@@ -56,10 +56,10 @@ type errorJSON struct {
 
 type clientMessage struct {
 	Type     string           `json:"type"`
-	From     coordinateJSON   `json:"from"`
-	To       coordinateJSON   `json:"to"`
+	From     jsonCoordinate   `json:"from"`
+	To       jsonCoordinate   `json:"to"`
 	Rotation uint8            `json:"rotation"`
-	King     []coordinateJSON `json:"king"`
+	King     []jsonCoordinate `json:"king"`
 }
 
 type wsClient struct {
@@ -76,8 +76,8 @@ func (c *wsClient) writeJSON(value any) error {
 type gameServer struct {
 	mu        sync.Mutex
 	board     Board
-	trueKing  KingPos
-	falseKing KingPos
+	trueKing  KingNeighbors
+	falseKing KingNeighbors
 	turn      bool
 	revision  uint64
 	clients   map[*wsClient]struct{}
@@ -86,8 +86,8 @@ type gameServer struct {
 func newGameServer() *gameServer {
 	return &gameServer{
 		board:     SetupBoard(false),
-		trueKing:  KingPos{Coord{2, 2}, Coord{3, 2}, Coord{2, 3}},
-		falseKing: KingPos{Coord{6, 6}, Coord{5, 6}, Coord{6, 5}},
+		trueKing:  KingNeighbors{Coord{2, 2}, Coord{3, 2}, Coord{2, 3}},
+		falseKing: KingNeighbors{Coord{6, 6}, Coord{5, 6}, Coord{6, 5}},
 		turn:      true,
 		clients:   make(map[*wsClient]struct{}),
 	}
@@ -106,11 +106,11 @@ func NewHandler() http.Handler {
 	return mux
 }
 
-func coordJSONFromCoord(coord Coord) coordinateJSON {
-	return coordinateJSON{X: coord.x, Y: coord.y}
+func coordJSONFromCoord(coord Coord) jsonCoordinate {
+	return jsonCoordinate{X: coord.x, Y: coord.y}
 }
 
-func kingPositionJSONFromKing(position KingPos) kingPositionJSON {
+func kingPositionJSONFromKing(position KingNeighbors) kingPositionJSON {
 	return kingPositionJSON{
 		coordJSONFromCoord(position[0]),
 		coordJSONFromCoord(position[1]),
@@ -118,15 +118,15 @@ func kingPositionJSONFromKing(position KingPos) kingPositionJSON {
 	}
 }
 
-func coordFromJSON(coord coordinateJSON) Coord {
+func coordFromJSON(coord jsonCoordinate) Coord {
 	return Coord{coord.X, coord.Y}
 }
 
-func kingPositionFromJSON(position []coordinateJSON) (KingPos, error) {
+func kingPositionFromJSON(position []jsonCoordinate) (KingNeighbors, error) {
 	if len(position) != 3 {
-		return KingPos{}, errors.New("king position must contain exactly three vertices")
+		return KingNeighbors{}, errors.New("king position must contain exactly three vertices")
 	}
-	return KingPos{
+	return KingNeighbors{
 		coordFromJSON(position[0]),
 		coordFromJSON(position[1]),
 		coordFromJSON(position[2]),
@@ -157,7 +157,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 				angles = []uint8{}
 			}
 			state.Board = append(state.Board, squareJSON{
-				Position: coordinateJSON{X: uint8(x), Y: uint8(rawY)},
+				Position: jsonCoordinate{X: uint8(x), Y: uint8(rawY)},
 				Piece: pieceJSON{
 					Color:  piece.col,
 					Angles: angles,
@@ -170,19 +170,19 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			if err != nil {
 				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
 			}
-			destinations := make([]coordinateJSON, 0, len(moves))
+			destinations := make([]jsonCoordinate, 0, len(moves))
 			king := s.trueKing
-			opponentKing := s.falseKing
+			//opponentKing := s.falseKing
 			if !s.turn {
 				king = s.falseKing
-				opponentKing = s.trueKing
+				//opponentKing = s.trueKing
 			}
 			for _, move := range moves {
-				nextBoard := cloneBoard(s.board)
-				if err := nextBoard.Move(Coord{uint8(x), uint8(rawY)}, move, piece); err != nil {
+				nextBoard := s.board.clone()
+				if err := nextBoard.Move(Coord{uint8(x), uint8(rawY)}, move, 0); err != nil { // I hotwired that zero in there. It will probably cause bugs later.
 					return stateJSON{}, fmt.Errorf("validate move from (%d, %d) to (%d, %d): %w", x, rawY, move.x, move.y, err)
 				}
-				inCheck, err := nextBoard.kingInCheck(king, s.turn, opponentKing)
+				inCheck, err := nextBoard.Check(king, s.turn)
 				if err != nil {
 					return stateJSON{}, fmt.Errorf("check king safety after move: %w", err)
 				}
@@ -192,7 +192,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 				destinations = append(destinations, coordJSONFromCoord(move))
 			}
 			state.LegalMoves = append(state.LegalMoves, sourceMovesJSON{
-				From: coordinateJSON{X: uint8(x), Y: uint8(rawY)},
+				From: jsonCoordinate{X: uint8(x), Y: uint8(rawY)},
 				To:   destinations,
 			})
 		}
@@ -221,7 +221,7 @@ func (s *gameServer) process(message clientMessage) error {
 	switch message.Type {
 	case "move":
 		from, to := coordFromJSON(message.From), coordFromJSON(message.To)
-		if !s.board.posExists(from) || !s.board.posExists(to) {
+		if !posExists(from) || !posExists(to) {
 			err = errors.New("move coordinates must be vertices on the board")
 			break
 		}
@@ -234,18 +234,18 @@ func (s *gameServer) process(message clientMessage) error {
 			err = errors.New("you can only move a piece belonging to the active side")
 			break
 		}
-		nextBoard := cloneBoard(s.board)
-		if err = nextBoard.MoveWithRotation(from, to, message.Rotation); err != nil {
+		nextBoard := s.board.clone()
+		if err = nextBoard.Move(from, to, message.Rotation); err != nil {
 			break
 		}
 		king := s.trueKing
-		opponentKing := s.falseKing
+		//opponentKing := s.falseKing
 		if !s.turn {
 			king = s.falseKing
-			opponentKing = s.trueKing
+			//opponentKing = s.trueKing
 		}
 		var inCheck bool
-		inCheck, err = nextBoard.kingInCheck(king, s.turn, opponentKing)
+		inCheck, err = nextBoard.Check(king, s.turn)
 		if err != nil {
 			break
 		}

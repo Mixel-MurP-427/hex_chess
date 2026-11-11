@@ -9,7 +9,7 @@ const (
 // TODO hash these constants and name the .gob after the hash.
 
 // A positive score favors the true player. Negative favors false.
-func (b *Board) getScore(color bool, trueKing, falseKing KingPos) (score int16, err error) {
+func (b *Board) getScore(color bool, trueKing, falseKing KingNeighbors) (score int16, err error) {
 	score = 0
 	err = nil
 	// Iterate over all spaces
