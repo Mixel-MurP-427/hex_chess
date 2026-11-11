@@ -125,7 +125,7 @@ function drawPiece(position, piece, isStaged = false) {
   group.append(svgElement("circle", { r: 12 }));
   for (let angle = 0; angle < 6; angle++) {
     // Iterate over only the available angle of the piece.
-    if ((piece.angles>>angle)&1 == 0) {continue;}
+    if (((piece.angles>>angle)&1) == 0) {continue;}
     const [dx, dy] = DIRECTIONS[angle];
     group.append(svgElement("line", {
       x1: 0, y1: 0, x2: dx * 23, y2: dy * 23, class: "ray",
@@ -279,11 +279,30 @@ function cancelDrag() {
   node.setAttribute("transform", baseTransform);
 }
 
+/**
+ * Rotates a number left by x bits, treating it as a 6-bit value.
+ * Bits 6 and 7 are forced to zero.
+ */
+function rotateLeft6Bit(b, x) {
+    // Mask to keep only the lower 6 bits (bits 6 and 7 set to 0)
+    b &= 0x3F;
+
+    // Normalize rotation amount to be within 0-5 (handles negative shifts safely)
+    x = ((x % 6) + 6) % 6;
+
+    if (x === 0) {
+        return b;
+    }
+
+    // Perform the 6-bit left rotation using unsigned right shift (>>>) and re-apply the mask
+    return ((b << x) | (b >>> (6 - x))) & 0x3F;
+}
+
 function stagedPiece() {
   if (!staged || staged.type !== "move") return undefined;
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(staged.from));
   if (!square) return undefined;
-  const angles = square.piece.angles.map((angle) => (angle + staged.rotation) % 6).sort((a, b) => a - b);
+  const angles = rotateLeft6Bit(square.piece.angles, staged.rotation);
   return { color: square.piece.color, angles };
 }
 
@@ -292,7 +311,7 @@ function render() {
   svg.replaceChildren();
   drawGrid();
   for (const square of gameState.board) {
-    if (square.piece.angles.length === 0) continue;
+    if (square.piece.angles === 0) continue;
     if (staged?.type === "move" &&
         (keyOf(square.position) === keyOf(staged.from) || keyOf(square.position) === keyOf(staged.to))) {
       continue;

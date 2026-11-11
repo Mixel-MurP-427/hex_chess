@@ -58,7 +58,7 @@ type clientMessage struct {
 	Type     string           `json:"type"`
 	From     jsonCoordinate   `json:"from"`
 	To       jsonCoordinate   `json:"to"`
-	Rotation int              `json:"rotation"`
+	Rotation uint8            `json:"rotation"`
 	King     []jsonCoordinate `json:"king"`
 }
 

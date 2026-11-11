@@ -2,7 +2,6 @@ package hexchess
 
 import (
 	"fmt"
-	"math/bits"
 	"slices"
 )
 
@@ -91,8 +90,17 @@ func posExists(c Coord) bool {
 	return false
 }
 
-func rotatePiece(piece Piece, steps int) Piece {
-	return Piece{piece.col, bits.RotateLeft8(piece.ang, steps)}
+func rotatePiece(piece Piece, steps uint8) Piece {
+	var newAng uint8
+	// Normalize rotation amount to be within 0-5
+	steps %= 6
+	if steps == 0 {
+		newAng = piece.ang
+	}
+
+	// Perform the 6-bit left rotation and re-apply the mask
+	newAng = ((piece.ang << steps) | (piece.ang >> uint(6-steps))) & 0x3F
+	return Piece{piece.col, newAng}
 }
 
 // Given Coordinate and angle, finds all spaces forward.
@@ -195,7 +203,7 @@ func (b *Board) getLegalMoves(c Coord) (output []Coord, err error) {
 
 // Accepts Coord of piece before and after, the movement angle, and the final Piece state.
 // TODO instead of inputing p2, input a rotation amount 0-5
-func (b *Board) Move(c1 Coord, c2 Coord, rotation int) error {
+func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 
 	if rotation > 5 {
 		return fmt.Errorf("invalid rotation %d: must be between 0 and 5", rotation)
