@@ -6,24 +6,24 @@ import (
 )
 
 type Coord struct {
-	x uint8
-	y uint8
+	X uint8
+	Y uint8
 }
 type Piece struct {
-	col bool  // Color: true represents self, false represents opponent.
-	ang uint8 // Angle: represents a list of direction values 0 to 5, where each bit tells whether that direction is in the list. Bits 7 and 8 are ignored.
+	Col bool  // Color: true represents self, false represents opponent.
+	Ang uint8 // Angle: represents a list of direction values 0 to 5, where each bit tells whether that direction is in the list. Bits 7 and 8 are ignored.
 }
 
 // If ontop, the king sits directly on top of coord. Else, it directly below coord.
 type KingPos struct {
-	coord Coord
-	ontop bool
+	KCoord Coord
+	Ontop  bool
 }
 type KingNeighbors [3]Coord
 
 var (
-	theTrueKing  = KingPos{Coord{2, 2}, true}
-	theFalseKing = KingPos{Coord{6, 6}, false}
+	TheTrueKing  = KingPos{Coord{2, 2}, true}
+	TheFalseKing = KingPos{Coord{6, 6}, false}
 )
 
 type Board [9]map[uint8]Piece
@@ -71,19 +71,19 @@ func (board *Board) clone() Board {
 // TODO change so that it compares numbers instead of checking the actual board. This will faulty additions to the board.
 func posExists(c Coord) bool {
 	// Must be between 0 and 8
-	if c.x >= 9 || c.y >= 9 {
+	if c.X >= 9 || c.Y >= 9 {
 		return false
 	}
-	if c.x <= 4 {
-		if c.y >= 4-c.x {
+	if c.X <= 4 {
+		if c.Y >= 4-c.X {
 			return true
 		}
 	} else {
-		if c.y <= 12-c.x {
+		if c.Y <= 12-c.X {
 			return true
 		}
 	}
-	// _, exists := b[c.x][c.y]
+	// _, exists := b[c.X][c.Y]
 	// if exists {
 	// 	return true
 	// }
@@ -95,12 +95,12 @@ func rotatePiece(piece Piece, steps uint8) Piece {
 	// Normalize rotation amount to be within 0-5
 	steps %= 6
 	if steps == 0 {
-		newAng = piece.ang
+		newAng = piece.Ang
 	}
 
 	// Perform the 6-bit left rotation and re-apply the mask
-	newAng = ((piece.ang << steps) | (piece.ang >> uint(6-steps))) & 0x3F
-	return Piece{piece.col, newAng}
+	newAng = ((piece.Ang << steps) | (piece.Ang >> uint(6-steps))) & 0x3F
+	return Piece{piece.Col, newAng}
 }
 
 // Given Coordinate and angle, finds all spaces forward.
@@ -111,38 +111,38 @@ func (b *Board) getSpacesInRow(c Coord, ang uint8) (output []Coord, err error) {
 	switch ang {
 	case 0:
 		// x increases, y decreases
-		for i, j := c.x+1, c.y-1; i < 9 && j < 9; i, j = i+1, j-1 {
+		for i, j := c.X+1, c.Y-1; i < 9 && j < 9; i, j = i+1, j-1 {
 			xs = append(xs, i)
 			ys = append(ys, j)
 		}
 	case 1:
 		// x increases, y stays constant
-		for i := c.x + 1; i < 9; i++ {
+		for i := c.X + 1; i < 9; i++ {
 			xs = append(xs, i)
-			ys = append(ys, c.y)
+			ys = append(ys, c.Y)
 		}
 	case 2:
 		// x stays constant, y increases
-		for j := c.y + 1; j < 9; j++ {
-			xs = append(xs, c.x)
+		for j := c.Y + 1; j < 9; j++ {
+			xs = append(xs, c.X)
 			ys = append(ys, j)
 		}
 	case 3:
 		// x decreases, y increases
-		for i, j := c.x-1, c.y+1; i < 9 && j < 9; i, j = i-1, j+1 {
+		for i, j := c.X-1, c.Y+1; i < 9 && j < 9; i, j = i-1, j+1 {
 			xs = append(xs, i)
 			ys = append(ys, j)
 		}
 	case 4:
 		// x decreases, y stays constant
-		for i := c.x - 1; i < 9; i-- {
+		for i := c.X - 1; i < 9; i-- {
 			xs = append(xs, i)
-			ys = append(ys, c.y)
+			ys = append(ys, c.Y)
 		}
 	case 5:
 		// x stays constant, y decreases
-		for j := c.y - 1; j < 9; j-- {
-			xs = append(xs, c.x)
+		for j := c.Y - 1; j < 9; j-- {
+			xs = append(xs, c.X)
 			ys = append(ys, j)
 		}
 	default:
@@ -161,17 +161,17 @@ func (b *Board) getSpacesInRow(c Coord, ang uint8) (output []Coord, err error) {
 }
 
 // Accepts Coord and angle direction
-func (b *Board) getLegalMoves(c Coord) (output []Coord, err error) {
+func (b *Board) GetLegalMoves(c Coord) (output []Coord, err error) {
 	output = []Coord{}
-	p, ok := b[c.x][c.y]
+	p, ok := b[c.X][c.Y]
 	if !ok {
-		return nil, fmt.Errorf("Error: Invalid position. (%d, %d) doesn't exist on board", c.x, c.y)
+		return nil, fmt.Errorf("Error: Invalid position. (%d, %d) doesn't exist on board", c.X, c.Y)
 	}
 
 	// Iterate over available angle of the piece.
 	for q := range uint8(6) {
 		// If angle q is not one of the angles
-		if (p.ang>>q)&1 == 0 {
+		if (p.Ang>>q)&1 == 0 {
 			continue
 		}
 		pFound := false
@@ -182,10 +182,10 @@ func (b *Board) getLegalMoves(c Coord) (output []Coord, err error) {
 		// Iterate over moves
 		for i, move := range moves {
 			// If the space is not empty
-			if b[move.x][move.y].ang != 0 {
+			if b[move.X][move.Y].Ang != 0 {
 				pFound = true
 				// If the colors match
-				if b[move.x][move.y].col == p.col {
+				if b[move.X][move.Y].Col == p.Col {
 					output = append(output, moves[:i]...)
 				} else {
 					output = append(output, moves[:i+1]...)
@@ -209,22 +209,22 @@ func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 		return fmt.Errorf("invalid rotation %d: must be between 0 and 5", rotation)
 	}
 
-	moves, err := b.getLegalMoves(c1)
+	moves, err := b.GetLegalMoves(c1)
 	if err != nil {
 		return err
 	}
 
 	if !slices.Contains(moves, c2) {
-		return fmt.Errorf("Error: Position (%d, %d) is not in the list of legal moves: %v", c2.x, c2.y, moves)
+		return fmt.Errorf("Error: Position (%d, %d) is not in the list of legal moves: %v", c2.X, c2.Y, moves)
 	}
 
 	// Check for check
-	kCol := b[c1.x][c1.y].col
+	kCol := b[c1.X][c1.Y].Col
 	var n KingNeighbors
 	if kCol {
-		n = theTrueKing.getKingNeighbors()
+		n = TheTrueKing.getKingNeighbors()
 	} else {
-		n = theFalseKing.getKingNeighbors()
+		n = TheFalseKing.getKingNeighbors()
 	}
 
 	isCheck, err := b.Check(n, kCol)
@@ -236,8 +236,8 @@ func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 	}
 
 	// Set board with new move
-	b[c2.x][c2.y] = rotatePiece(b[c1.x][c1.y], rotation)
-	b[c1.x][c1.y] = Piece{}
+	b[c2.X][c2.Y] = rotatePiece(b[c1.X][c1.Y], rotation)
+	b[c1.X][c1.Y] = Piece{}
 
 	return nil
 }
@@ -249,7 +249,7 @@ func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
 	// Iterate over the king's neighboring spaces
 	for _, space := range kN {
 		// Continue if an enemy piece sits in this space.
-		if b[space.x][space.y].ang != 0 && b[space.x][space.y].col != kCol {
+		if b[space.X][space.Y].Ang != 0 && b[space.X][space.Y].Col != kCol {
 			continue
 		}
 		// Iterate over all six directions
@@ -257,27 +257,27 @@ func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
 			// Continue if the adjacent space does not also border the king.
 			switch a {
 			case 0:
-				if !slices.Contains(kN[:], Coord{space.x + 1, space.y - 1}) {
+				if !slices.Contains(kN[:], Coord{space.X + 1, space.Y - 1}) {
 					continue
 				}
 			case 1:
-				if !slices.Contains(kN[:], Coord{space.x + 1, space.y}) {
+				if !slices.Contains(kN[:], Coord{space.X + 1, space.Y}) {
 					continue
 				}
 			case 2:
-				if !slices.Contains(kN[:], Coord{space.x, space.y + 1}) {
+				if !slices.Contains(kN[:], Coord{space.X, space.Y + 1}) {
 					continue
 				}
 			case 3:
-				if !slices.Contains(kN[:], Coord{space.x - 1, space.y + 1}) {
+				if !slices.Contains(kN[:], Coord{space.X - 1, space.Y + 1}) {
 					continue
 				}
 			case 4:
-				if !slices.Contains(kN[:], Coord{space.x - 1, space.y}) {
+				if !slices.Contains(kN[:], Coord{space.X - 1, space.Y}) {
 					continue
 				}
 			case 5:
-				if !slices.Contains(kN[:], Coord{space.x, space.y - 1}) {
+				if !slices.Contains(kN[:], Coord{space.X, space.Y - 1}) {
 					continue
 				}
 			}
@@ -286,11 +286,11 @@ func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
 				return false, err
 			}
 			for _, move := range moves {
-				p := b[move.x][move.y]
+				p := b[move.X][move.Y]
 				// If there is a piece here
-				if p.ang != 0 {
+				if p.Ang != 0 {
 					// If it is an enemy piece pointing at the king
-					if p.col != kCol && (p.ang>>((a+3)%6))&1 == 1 { // get the ((a+3)%6)th bit (opposite direction of var a) and check if == 1
+					if p.Col != kCol && (p.Ang>>((a+3)%6))&1 == 1 { // get the ((a+3)%6)th bit (opposite direction of var a) and check if == 1
 						// Check situation found!
 						return true, nil
 					}
@@ -304,10 +304,10 @@ func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
 }
 
 func (k *KingPos) getKingNeighbors() KingNeighbors {
-	if k.ontop {
-		return KingNeighbors{k.coord, Coord{k.coord.x, k.coord.y + 1}, Coord{k.coord.x + 1, k.coord.y}}
+	if k.Ontop {
+		return KingNeighbors{k.KCoord, Coord{k.KCoord.X, k.KCoord.Y + 1}, Coord{k.KCoord.X + 1, k.KCoord.Y}}
 	} else {
-		return KingNeighbors{k.coord, Coord{k.coord.x, k.coord.y - 1}, Coord{k.coord.x - 1, k.coord.y}}
+		return KingNeighbors{k.KCoord, Coord{k.KCoord.X, k.KCoord.Y - 1}, Coord{k.KCoord.X - 1, k.KCoord.Y}}
 	}
 }
 
@@ -323,17 +323,17 @@ func (n *KingNeighbors) validKingNeighbors() bool {
 // Get the locations where the king can move on the board
 func (k *KingPos) getMoves() (moves []Coord) {
 	// Get available adjacent moves
-	if k.ontop {
-		moves = []Coord{{k.coord.x, k.coord.y + 1}, {k.coord.x + 1, k.coord.y}, {k.coord.x + 1, k.coord.y + 1}}
+	if k.Ontop {
+		moves = []Coord{{k.KCoord.X, k.KCoord.Y + 1}, {k.KCoord.X + 1, k.KCoord.Y}, {k.KCoord.X + 1, k.KCoord.Y + 1}}
 	} else {
-		moves = []Coord{{k.coord.x, k.coord.y - 1}, {k.coord.x - 1, k.coord.y}, {k.coord.x - 1, k.coord.y - 1}}
+		moves = []Coord{{k.KCoord.X, k.KCoord.Y - 1}, {k.KCoord.X - 1, k.KCoord.Y}, {k.KCoord.X - 1, k.KCoord.Y - 1}}
 	}
 
 	// Validate that these moves lie on the board
 	keepIndex := 0
 	// Sort moves and only return valid ones
 	for _, move := range moves {
-		newK := KingPos{move, !k.ontop}
+		newK := KingPos{move, !k.Ontop}
 		newN := newK.getKingNeighbors()
 		if newN.validKingNeighbors() {
 			moves[keepIndex] = move
@@ -349,7 +349,7 @@ func (k1 *KingPos) Move(b *Board, c2 Coord, kCol bool) error {
 	if !n1.validKingNeighbors() {
 		return fmt.Errorf("Error: Invalid king location: (%v) not on board.", k1)
 	}
-	k2 := KingPos{c2, !k1.ontop}
+	k2 := KingPos{c2, !k1.Ontop}
 	n2 := k2.getKingNeighbors()
 	if !n2.validKingNeighbors() {
 		return fmt.Errorf("Error: Invalid king location: (%v) not on board.", c2)

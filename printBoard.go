@@ -26,13 +26,13 @@ func (b *Board) printBoard() {
 		spaces = slices.Concat([]Coord{{xs[i], ys[i]}}, spaces)
 
 		for j, space := range spaces {
-			p := b[space.x][space.y]
+			p := b[space.X][space.Y]
 
-			if p.ang == 0 {
+			if p.Ang == 0 {
 				pb[i][j] = 3
 				continue
 			}
-			if p.col {
+			if p.Col {
 				pb[i][j] = 1
 			} else {
 				pb[i][j] = 2

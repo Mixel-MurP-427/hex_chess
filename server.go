@@ -16,6 +16,8 @@ import (
 //go:embed web
 var webAssets embed.FS
 
+// These types are dumb lol. I'll probably replace them, idk.
+
 type jsonCoordinate struct {
 	X uint8 `json:"x"`
 	Y uint8 `json:"y"`
@@ -86,9 +88,9 @@ type gameServer struct {
 func newGameServer() *gameServer {
 	return &gameServer{
 		board:     SetupBoard(false),
-		trueKing:  KingNeighbors{Coord{2, 2}, Coord{3, 2}, Coord{2, 3}},
-		falseKing: KingNeighbors{Coord{6, 6}, Coord{5, 6}, Coord{6, 5}},
-		turn:      true,
+		trueKing:  TheTrueKing.getKingNeighbors(),
+		falseKing: TheFalseKing.getKingNeighbors(),
+		turn:      true, // True player goes first
 		clients:   make(map[*wsClient]struct{}),
 	}
 }
@@ -107,7 +109,7 @@ func NewHandler() http.Handler {
 }
 
 func coordJSONFromCoord(coord Coord) jsonCoordinate {
-	return jsonCoordinate{X: coord.x, Y: coord.y}
+	return jsonCoordinate{X: coord.X, Y: coord.Y}
 }
 
 func kingPositionJSONFromKing(position KingNeighbors) kingPositionJSON {
@@ -152,19 +154,19 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		slices.Sort(ys)
 		for _, rawY := range ys {
 			piece := row[uint8(rawY)]
-			angles := piece.ang
+			angles := piece.Ang
 
 			state.Board = append(state.Board, squareJSON{
 				Position: jsonCoordinate{X: uint8(x), Y: uint8(rawY)},
 				Piece: pieceJSON{
-					Color:  piece.col,
+					Color:  piece.Col,
 					Angles: angles,
 				},
 			})
-			if piece.ang == 0 || piece.col != s.turn {
+			if piece.Ang == 0 || piece.Col != s.turn {
 				continue
 			}
-			moves, err := s.board.getLegalMoves(Coord{uint8(x), uint8(rawY)})
+			moves, err := s.board.GetLegalMoves(Coord{uint8(x), uint8(rawY)})
 			if err != nil {
 				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
 			}
@@ -178,7 +180,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			for _, move := range moves {
 				nextBoard := s.board.clone()
 				if err := nextBoard.Move(Coord{uint8(x), uint8(rawY)}, move, 0); err != nil { // I hotwired that zero in there. It will probably cause bugs later.
-					return stateJSON{}, fmt.Errorf("validate move from (%d, %d) to (%d, %d): %w", x, rawY, move.x, move.y, err)
+					return stateJSON{}, fmt.Errorf("validate move from (%d, %d) to (%d, %d): %w", x, rawY, move.X, move.Y, err)
 				}
 				inCheck, err := nextBoard.Check(king, s.turn)
 				if err != nil {
@@ -223,12 +225,12 @@ func (s *gameServer) process(message clientMessage) error {
 			err = errors.New("move coordinates must be vertices on the board")
 			break
 		}
-		piece := s.board[from.x][from.y]
-		if piece.ang == 0 {
+		piece := s.board[from.X][from.Y]
+		if piece.Ang == 0 {
 			err = errors.New("there is no piece at the selected vertex")
 			break
 		}
-		if piece.col != s.turn {
+		if piece.Col != s.turn {
 			err = errors.New("you can only move a piece belonging to the active side")
 			break
 		}

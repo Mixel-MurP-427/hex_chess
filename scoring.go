@@ -17,10 +17,10 @@ func (b *Board) getScore(color bool) (score int16, err error) {
 	// Iterate over all spaces
 	for _, row := range b {
 		for _, space := range row {
-			if space.col {
-				score += int16(bits.OnesCount8(space.ang)) * pScore
+			if space.Col {
+				score += int16(bits.OnesCount8(space.Ang)) * pScore
 			} else {
-				score -= int16(bits.OnesCount8(space.ang)) * pScore
+				score -= int16(bits.OnesCount8(space.Ang)) * pScore
 			}
 		}
 	}
@@ -29,7 +29,7 @@ func (b *Board) getScore(color bool) (score int16, err error) {
 	// Add bonus points based on check:
 
 	// true player
-	isCheck, err := b.Check(theTrueKing.getKingNeighbors(), true)
+	isCheck, err := b.Check(TheTrueKing.getKingNeighbors(), true)
 	if err != nil {
 		return
 	}
@@ -42,7 +42,7 @@ func (b *Board) getScore(color bool) (score int16, err error) {
 	}
 
 	// false player
-	isCheck, err = b.Check(theFalseKing.getKingNeighbors(), false)
+	isCheck, err = b.Check(TheFalseKing.getKingNeighbors(), false)
 	if err != nil {
 		return
 	}
