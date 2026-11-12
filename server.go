@@ -16,39 +16,25 @@ import (
 //go:embed web
 var webAssets embed.FS
 
-// These types are dumb lol. I'll probably replace them, idk.
-
-type jsonCoordinate struct {
-	X uint8 `json:"x"`
-	Y uint8 `json:"y"`
-}
-
-type pieceJSON struct {
-	Color  bool  `json:"color"`
-	Angles uint8 `json:"angles"`
-}
-
 type squareJSON struct {
-	Position jsonCoordinate `json:"position"`
-	Piece    pieceJSON      `json:"piece"`
+	Position Coord `json:"position"`
+	Piece    Piece `json:"piece"`
 }
 
 type sourceMovesJSON struct {
-	From jsonCoordinate   `json:"from"`
-	To   []jsonCoordinate `json:"to"`
+	From Coord   `json:"from"`
+	To   []Coord `json:"to"`
 }
 
-type kingPositionJSON [3]jsonCoordinate
-
 type stateJSON struct {
-	Type           string             `json:"type"`
-	Revision       uint64             `json:"revision"`
-	Board          []squareJSON       `json:"board"`
-	Turn           bool               `json:"turn"`
-	TrueKing       kingPositionJSON   `json:"trueKing"`
-	FalseKing      kingPositionJSON   `json:"falseKing"`
-	LegalMoves     []sourceMovesJSON  `json:"legalMoves"`
-	LegalKingMoves []kingPositionJSON `json:"legalKingMoves"`
+	Type           string            `json:"type"`
+	Revision       uint64            `json:"revision"`
+	Board          []squareJSON      `json:"board"`
+	Turn           bool              `json:"turn"`
+	TrueKing       KingNeighbors     `json:"trueKing"`
+	FalseKing      KingNeighbors     `json:"falseKing"`
+	LegalMoves     []sourceMovesJSON `json:"legalMoves"`
+	LegalKingMoves []KingNeighbors   `json:"legalKingMoves"`
 }
 
 type errorJSON struct {
@@ -57,11 +43,11 @@ type errorJSON struct {
 }
 
 type clientMessage struct {
-	Type     string           `json:"type"`
-	From     jsonCoordinate   `json:"from"`
-	To       jsonCoordinate   `json:"to"`
-	Rotation uint8            `json:"rotation"`
-	King     []jsonCoordinate `json:"king"`
+	Type     string  `json:"type"`
+	From     Coord   `json:"from"`
+	To       Coord   `json:"to"`
+	Rotation uint8   `json:"rotation"`
+	King     []Coord `json:"king"`
 }
 
 type wsClient struct {
@@ -108,31 +94,12 @@ func NewHandler() http.Handler {
 	return mux
 }
 
-func coordJSONFromCoord(coord Coord) jsonCoordinate {
-	return jsonCoordinate{X: coord.X, Y: coord.Y}
-}
-
-func kingPositionJSONFromKing(position KingNeighbors) kingPositionJSON {
-	return kingPositionJSON{
-		coordJSONFromCoord(position[0]),
-		coordJSONFromCoord(position[1]),
-		coordJSONFromCoord(position[2]),
-	}
-}
-
-func coordFromJSON(coord jsonCoordinate) Coord {
-	return Coord{coord.X, coord.Y}
-}
-
-func kingPositionFromJSON(position []jsonCoordinate) (KingNeighbors, error) {
+// What does this do?
+func kingPositionFromJSON(position []Coord) (KingNeighbors, error) {
 	if len(position) != 3 {
 		return KingNeighbors{}, errors.New("king position must contain exactly three vertices")
 	}
-	return KingNeighbors{
-		coordFromJSON(position[0]),
-		coordFromJSON(position[1]),
-		coordFromJSON(position[2]),
-	}, nil
+	return KingNeighbors{position[0], position[1], position[2]}, nil
 }
 
 func (s *gameServer) stateLocked() (stateJSON, error) {
@@ -141,10 +108,10 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		Revision:       s.revision,
 		Board:          make([]squareJSON, 0, 61),
 		Turn:           s.turn,
-		TrueKing:       kingPositionJSONFromKing(s.trueKing),
-		FalseKing:      kingPositionJSONFromKing(s.falseKing),
+		TrueKing:       s.trueKing,
+		FalseKing:      s.falseKing,
 		LegalMoves:     make([]sourceMovesJSON, 0),
-		LegalKingMoves: make([]kingPositionJSON, 0),
+		LegalKingMoves: make([]KingNeighbors, 0),
 	}
 	for x, row := range s.board {
 		ys := make([]int, 0, len(row))
@@ -157,11 +124,8 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			angles := piece.Ang
 
 			state.Board = append(state.Board, squareJSON{
-				Position: jsonCoordinate{X: uint8(x), Y: uint8(rawY)},
-				Piece: pieceJSON{
-					Color:  piece.Col,
-					Angles: angles,
-				},
+				Position: Coord{uint8(x), uint8(rawY)},
+				Piece:    Piece{piece.Col, angles},
 			})
 			if piece.Ang == 0 || piece.Col != s.turn {
 				continue
@@ -170,7 +134,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			if err != nil {
 				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
 			}
-			destinations := make([]jsonCoordinate, 0, len(moves))
+			destinations := make([]Coord, 0, len(moves))
 			king := s.trueKing
 			//opponentKing := s.falseKing
 			if !s.turn {
@@ -189,10 +153,10 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 				if inCheck {
 					continue
 				}
-				destinations = append(destinations, coordJSONFromCoord(move))
+				destinations = append(destinations, move)
 			}
 			state.LegalMoves = append(state.LegalMoves, sourceMovesJSON{
-				From: jsonCoordinate{X: uint8(x), Y: uint8(rawY)},
+				From: Coord{uint8(x), uint8(rawY)},
 				To:   destinations,
 			})
 		}
@@ -208,7 +172,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		return stateJSON{}, fmt.Errorf("calculate legal king moves: %w", err)
 	}
 	for _, move := range kingMoves {
-		state.LegalKingMoves = append(state.LegalKingMoves, kingPositionJSONFromKing(move))
+		state.LegalKingMoves = append(state.LegalKingMoves, move)
 	}
 	return state, nil
 }
@@ -220,7 +184,7 @@ func (s *gameServer) process(message clientMessage) error {
 	var err error
 	switch message.Type {
 	case "move":
-		from, to := coordFromJSON(message.From), coordFromJSON(message.To)
+		from, to := message.From, message.To
 		if !posExists(from) || !posExists(to) {
 			err = errors.New("move coordinates must be vertices on the board")
 			break
