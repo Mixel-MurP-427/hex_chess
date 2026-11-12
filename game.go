@@ -161,7 +161,7 @@ func (b *Board) getSpacesInRow(c Coord, ang uint8) (output []Coord, err error) {
 }
 
 // Accepts Coord and angle direction
-func (b *Board) GetLegalMoves(c Coord) (output []Coord, err error) {
+func (b *Board) GetLegalMoves(c Coord, check4Check bool) (output []Coord, err error) {
 	output = []Coord{}
 	p, ok := b[c.X][c.Y]
 	if !ok {
@@ -174,7 +174,6 @@ func (b *Board) GetLegalMoves(c Coord) (output []Coord, err error) {
 		if (p.Ang>>q)&1 == 0 {
 			continue
 		}
-		pFound := false
 		moves, gErr := b.getSpacesInRow(c, q)
 		if gErr != nil {
 			return nil, gErr
@@ -183,18 +182,50 @@ func (b *Board) GetLegalMoves(c Coord) (output []Coord, err error) {
 		for i, move := range moves {
 			// If the space is not empty
 			if b[move.X][move.Y].Ang != 0 {
-				pFound = true
 				// If the colors match
 				if b[move.X][move.Y].Col == p.Col {
-					output = append(output, moves[:i]...)
+					moves = moves[:i]
 				} else {
-					output = append(output, moves[:i+1]...)
+					moves = moves[:i+1]
 				}
 				break
 			}
 		}
-		// If the entire move path was empty
-		if !pFound {
+
+		// Check if each move would put the moving player in check
+		if check4Check {
+
+			// Get neighbors of king
+			kCol := b[c.X][c.Y].Col
+			var n KingNeighbors
+			if kCol {
+				n = TheTrueKing.getKingNeighbors()
+			} else {
+				n = TheFalseKing.getKingNeighbors()
+			}
+
+			keepIndex := 0
+			// Iterate over moves
+			for _, move := range moves {
+
+				// Clone board
+				bClone := b.clone()
+				// move piece
+				bClone[move.X][move.Y] = b[c.X][c.Y]
+
+				isCheck, err := bClone.Check(n, kCol)
+				if err != nil {
+					return []Coord{}, err
+				}
+				// Exclude moves that result in check
+				if isCheck {
+					moves[keepIndex] = move
+					keepIndex++
+				}
+			}
+			// Add available moves in this direction to output
+			output = append(output, moves[:keepIndex]...)
+		} else {
 			output = append(output, moves...)
 		}
 	}
@@ -209,7 +240,7 @@ func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 		return fmt.Errorf("invalid rotation %d: must be between 0 and 5", rotation)
 	}
 
-	moves, err := b.GetLegalMoves(c1)
+	moves, err := b.GetLegalMoves(c1, false)
 	if err != nil {
 		return err
 	}

@@ -26,6 +26,7 @@ type sourceMovesJSON struct {
 	To   []Coord `json:"to"`
 }
 
+// TODO pass KingPos instead of KingNeighbors
 type stateJSON struct {
 	Type           string            `json:"type"`
 	Revision       uint64            `json:"revision"`
@@ -113,6 +114,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		LegalMoves:     make([]sourceMovesJSON, 0),
 		LegalKingMoves: make([]KingNeighbors, 0),
 	}
+	// TODO convert x and rawY to uint8 from the get-go
 	for x, row := range s.board {
 		ys := make([]int, 0, len(row))
 		for y := range row {
@@ -130,7 +132,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			if piece.Ang == 0 || piece.Col != s.turn {
 				continue
 			}
-			moves, err := s.board.GetLegalMoves(Coord{uint8(x), uint8(rawY)})
+			moves, err := s.board.GetLegalMoves(Coord{uint8(x), uint8(rawY)}, true)
 			if err != nil {
 				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
 			}
@@ -143,6 +145,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			}
 			for _, move := range moves {
 				nextBoard := s.board.clone()
+				// TODO This if block is unnecessary?
 				if err := nextBoard.Move(Coord{uint8(x), uint8(rawY)}, move, 0); err != nil { // I hotwired that zero in there. It will probably cause bugs later.
 					return stateJSON{}, fmt.Errorf("validate move from (%d, %d) to (%d, %d): %w", x, rawY, move.X, move.Y, err)
 				}
