@@ -11,7 +11,7 @@ const (
 // TODO hash these constants and name the .gob after the hash.
 
 // A positive score favors the true player. Negative favors false.
-func (b *Board) getScore(color bool, trueKing, falseKing KingNeighbors) (score int16, err error) {
+func (b *Board) getScore(color bool) (score int16, err error) {
 	score = 0
 	err = nil
 	// Iterate over all spaces
@@ -29,7 +29,7 @@ func (b *Board) getScore(color bool, trueKing, falseKing KingNeighbors) (score i
 	// Add bonus points based on check:
 
 	// true player
-	isCheck, err := b.Check(trueKing, true)
+	isCheck, err := b.Check(theTrueKing.getKingNeighbors(), true)
 	if err != nil {
 		return
 	}
@@ -42,7 +42,7 @@ func (b *Board) getScore(color bool, trueKing, falseKing KingNeighbors) (score i
 	}
 
 	// false player
-	isCheck, err = b.Check(falseKing, false)
+	isCheck, err = b.Check(theFalseKing.getKingNeighbors(), false)
 	if err != nil {
 		return
 	}

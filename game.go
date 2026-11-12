@@ -22,8 +22,8 @@ type KingPos struct {
 type KingNeighbors [3]Coord
 
 var (
-	tKStart = KingPos{Coord{2, 2}, true}
-	fKStart = KingPos{Coord{6, 6}, false}
+	theTrueKing  = KingPos{Coord{2, 2}, true}
+	theFalseKing = KingPos{Coord{6, 6}, false}
 )
 
 type Board [9]map[uint8]Piece
@@ -216,6 +216,23 @@ func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 
 	if !slices.Contains(moves, c2) {
 		return fmt.Errorf("Error: Position (%d, %d) is not in the list of legal moves: %v", c2.x, c2.y, moves)
+	}
+
+	// Check for check
+	kCol := b[c1.x][c1.y].col
+	var n KingNeighbors
+	if kCol {
+		n = theTrueKing.getKingNeighbors()
+	} else {
+		n = theFalseKing.getKingNeighbors()
+	}
+
+	isCheck, err := b.Check(n, kCol)
+	if err != nil {
+		return err
+	}
+	if isCheck {
+		return fmt.Errorf("Cannot move from (%v) to (%v) because it would result in check.", c1, c2)
 	}
 
 	// Set board with new move
