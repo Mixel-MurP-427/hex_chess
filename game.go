@@ -352,7 +352,7 @@ func (n *KingNeighbors) validKingNeighbors() bool {
 }
 
 // Get the locations where the king can move on the board
-func (k *KingPos) getMoves() (moves []Coord) {
+func (k *KingPos) GetLegalMoves(b *Board, check4Check bool) (moves []Coord, err error) {
 	// Get available adjacent moves
 	if k.Ontop {
 		moves = []Coord{{k.KCoord.X, k.KCoord.Y + 1}, {k.KCoord.X + 1, k.KCoord.Y}, {k.KCoord.X + 1, k.KCoord.Y + 1}}
@@ -366,12 +366,23 @@ func (k *KingPos) getMoves() (moves []Coord) {
 	for _, move := range moves {
 		newK := KingPos{move, !k.Ontop}
 		newN := newK.getKingNeighbors()
+		// if this move lies on the board
 		if newN.validKingNeighbors() {
+			// if move results in check
+			if check4Check {
+				isCheck, err := b.Check(newN, !k.Ontop)
+				if err != nil {
+					return []Coord{}, err
+				}
+				if isCheck {
+					continue
+				}
+			}
 			moves[keepIndex] = move
 			keepIndex++
 		}
 	}
-	return moves[:keepIndex]
+	return moves[:keepIndex], nil
 }
 
 func (k1 *KingPos) Move(b *Board, c2 Coord, kCol bool) error {
@@ -387,8 +398,12 @@ func (k1 *KingPos) Move(b *Board, c2 Coord, kCol bool) error {
 	}
 
 	// Check if this move is to an adjacent triangle
-	if !slices.Contains(k1.getMoves(), c2) {
-		return fmt.Errorf("Error: Invalid king move from (%v) to (%v). Move must be one of the following: %v", k1, c2, k1.getMoves())
+	moves, err := k1.GetLegalMoves(b, false)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(moves, c2) {
+		return fmt.Errorf("Error: Invalid king move from (%v) to (%v). Move must be one of the following: %v", k1, c2, moves)
 	}
 
 	isCheck, err := b.Check(n2, kCol)
