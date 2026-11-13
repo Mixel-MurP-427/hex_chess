@@ -68,7 +68,6 @@ func (board *Board) clone() Board {
 	return cloned
 }
 
-// TODO change so that it compares numbers instead of checking the actual board. This will faulty additions to the board.
 func posExists(c Coord) bool {
 	// Must be between 0 and 8
 	if c.X >= 9 || c.Y >= 9 {
@@ -83,10 +82,6 @@ func posExists(c Coord) bool {
 			return true
 		}
 	}
-	// _, exists := b[c.X][c.Y]
-	// if exists {
-	// 	return true
-	// }
 	return false
 }
 
@@ -233,7 +228,6 @@ func (b *Board) GetLegalMoves(c Coord, check4Check bool) (output []Coord, err er
 }
 
 // Accepts Coord of piece before and after, the movement angle, and the final Piece state.
-// TODO instead of inputing p2, input a rotation amount 0-5
 func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 
 	if rotation > 5 {

@@ -94,16 +94,7 @@ func NewHandler() http.Handler {
 	return mux
 }
 
-// // What does this do? We can delete this one we convert from KingNeighbors to KingPos
-// func kingPositionFromJSON(position []Coord) (KingNeighbors, error) {
-// 	if len(position) != 3 {
-// 		return KingNeighbors{}, errors.New("king position must contain exactly three vertices")
-// 	}
-// 	return KingNeighbors{position[0], position[1], position[2]}, nil
-// }
-
 // Provides available actions to the current player
-
 func (s *gameServer) stateLocked() (stateJSON, error) {
 	state := stateJSON{
 		Type:           "state",
@@ -147,32 +138,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			if err != nil {
 				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
 			}
-			// destinations := make([]Coord, 0, len(moves))
-			// // Set the king
-			// king := s.trueKing
-			// //opponentKing := s.falseKing
-			// if !s.turn {
-			// 	king = s.falseKing
-			// 	//opponentKing = s.trueKing
-			// }
-			// // validate moves for this piece
-			// for _, move := range moves {
-			// 	// The code below in unecessary because it is handled by GetLegalMoves in game.go
-			// 	// clone board
-			// 	nextBoard := s.board.clone()
-			// 	// TODO This if block is unnecessary?
-			// 	if err := nextBoard.Move(Coord{x, rawY}, move, 0); err != nil { // I hotwired that zero in there. It will probably cause bugs later.
-			// 		return stateJSON{}, fmt.Errorf("validate move from (%d, %d) to (%d, %d): %w", x, rawY, move.X, move.Y, err)
-			// 	}
-			// 	inCheck, err := nextBoard.Check(king, s.turn)
-			// 	if err != nil {
-			// 		return stateJSON{}, fmt.Errorf("check king safety after move: %w", err)
-			// 	}
-			// 	if inCheck {
-			// 		continue
-			// 	}
-			// 	destinations = append(destinations, move)
-			// }
+
 			state.LegalMoves = append(state.LegalMoves, sourceMovesJSON{ // TODO Is this bugged?
 				From: Coord{x, rawY},
 				To:   moves,
@@ -188,14 +154,6 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 	} else {
 		activeKing = s.falseKing
 	}
-
-	// kingMoves, err := s.board.KingMovesAgainst(activeKing, s.turn, opponentKing)
-	// if err != nil {
-	// 	return stateJSON{}, fmt.Errorf("calculate legal king moves: %w", err)
-	// }
-	// for _, move := range kingMoves {
-	// 	state.LegalKingMoves = append(state.LegalKingMoves, move)
-	// }
 
 	cMoves, err := activeKing.GetLegalMoves(&s.board, true)
 	if err != nil {
@@ -240,22 +198,6 @@ func (s *gameServer) process(message clientMessage) error {
 		if err = nextBoard.Move(from, to, message.Rotation); err != nil {
 			break
 		}
-		// TODO remove this code because check handling already occurs
-		// king := s.trueKing
-		// //opponentKing := s.falseKing
-		// if !s.turn {
-		// 	king = s.falseKing
-		// 	//opponentKing = s.trueKing
-		// }
-		// var inCheck bool
-		// inCheck, err = nextBoard.Check(king.getKingNeighbors(), s.turn)
-		// if err != nil {
-		// 	break
-		// }
-		// if inCheck {
-		// 	err = errors.New("move would leave your king in check")
-		// 	break
-		// }
 
 		// Advance the game
 		s.board = nextBoard
@@ -264,21 +206,6 @@ func (s *gameServer) process(message clientMessage) error {
 
 	// if a king was moved
 	case "king_move":
-
-		// currentKing := s.trueKing
-		// opponentKing := s.falseKing
-		// if !s.turn {
-		// 	currentKing = s.falseKing
-		// 	opponentKing = s.trueKing
-		// }
-		// if err = s.board.MoveKingAgainst(currentKing, message.King, s.turn, opponentKing); err != nil {
-		// 	break
-		// }
-		// if s.turn {
-		// 	s.trueKing = canonicalKingPosition(message.King)
-		// } else {
-		// 	s.falseKing = canonicalKingPosition(message.King)
-		// }
 
 		// Get active king
 		var activeKing *KingPos
