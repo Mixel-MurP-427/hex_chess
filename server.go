@@ -74,10 +74,25 @@ type gameServer struct {
 func newGameServer() *gameServer {
 	return &gameServer{
 		board:     SetupBoard(false),
-		trueKing:  TheTrueKing,
-		falseKing: TheFalseKing,
+		trueKing:  InitKing(true),
+		falseKing: InitKing(false),
 		turn:      true, // True player goes first
 		clients:   make(map[*wsClient]struct{}),
+	}
+}
+
+func (s *gameServer) getActiveKing() KingPos {
+	if s.turn {
+		return s.trueKing
+	} else {
+		return s.falseKing
+	}
+}
+func (s *gameServer) getPointerToActiveKing() *KingPos {
+	if s.turn {
+		return &s.trueKing
+	} else {
+		return &s.falseKing
 	}
 }
 
@@ -107,6 +122,8 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		LegalKingMoves: make([]KingPos, 0),
 	}
 
+	activeKing := s.getActiveKing()
+
 	// Get available moves that each piece can make
 
 	for xInt, row := range s.board {
@@ -134,7 +151,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 				continue
 			}
 			// Get legal moves for this piece
-			moves, err := s.board.GetLegalMoves(Coord{x, rawY}, true)
+			moves, err := s.board.GetLegalMoves(Coord{x, rawY}, true, activeKing)
 			if err != nil {
 				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
 			}
@@ -148,13 +165,6 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 
 	// Get king moves
 
-	var activeKing KingPos
-	if s.turn {
-		activeKing = s.trueKing // TODO just use the global king values?
-	} else {
-		activeKing = s.falseKing
-	}
-
 	cMoves, err := activeKing.GetLegalMoves(&s.board, true)
 	if err != nil {
 		return stateJSON{}, fmt.Errorf("calculate legal king moves: %w", err)
@@ -162,7 +172,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 
 	state.LegalKingMoves = []KingPos{}
 	for _, move := range cMoves {
-		state.LegalKingMoves = append(state.LegalKingMoves, KingPos{move, !activeKing.Ontop})
+		state.LegalKingMoves = append(state.LegalKingMoves, KingPos{move, !activeKing.Ontop, activeKing.Col})
 	}
 	return state, nil
 }
@@ -173,6 +183,7 @@ func (s *gameServer) process(message clientMessage) error {
 	oldBoard, oldTrueKing, oldFalseKing := s.board, s.trueKing, s.falseKing
 	oldTurn, oldRevision := s.turn, s.revision
 	var err error
+	activeKing := s.getPointerToActiveKing() // TODO test this
 	// read message
 	switch message.Type {
 	// If a normal piece was moved
@@ -180,50 +191,31 @@ func (s *gameServer) process(message clientMessage) error {
 		from, to := message.From, message.To
 
 		// Validation
-		if !posExists(from) || !posExists(to) {
-			err = errors.New("move coordinates must be vertices on the board")
-			break
-		}
-		piece := s.board[from.X][from.Y]
-		if piece.Ang == 0 {
-			err = errors.New("there is no piece at the selected vertex")
-			break
-		}
-		if piece.Col != s.turn {
+		if s.board[from.X][from.Y].Col != s.turn {
 			err = errors.New("you can only move a piece belonging to the active side")
-			break
-		}
-		// TODO unnecessary?
-		nextBoard := s.board.clone()
-		if err = nextBoard.Move(from, to, message.Rotation); err != nil {
 			break
 		}
 
 		// Advance the game
-		s.board = nextBoard
+		err = s.board.Move(from, to, message.Rotation, *activeKing)
+		if err != nil {
+			break
+		}
 		s.turn = !s.turn
 		s.revision++
 
 	// if a king was moved
 	case "king_move":
 
-		// Get active king
-		var activeKing *KingPos
-		var oldMan KingPos
-		if s.turn {
-			activeKing = &s.trueKing // TODO just use the global king values?
-			oldMan = oldTrueKing
-		} else {
-			activeKing = &s.falseKing
-			oldMan = oldFalseKing
-		}
+		fmt.Println("It should edit the king now:")
+		fmt.Println(s)
 
 		// Try moving the king
-		if err = activeKing.Move(&s.board, message.King.KCoord, s.turn); err != nil {
-			// Reset the king if the move fails
-			*activeKing = oldMan
+		if err = activeKing.Move(&s.board, message.King.KCoord); err != nil {
 			break
 		}
+
+		fmt.Println(s)
 
 		// Advance the game
 		s.turn = !s.turn

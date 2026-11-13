@@ -18,13 +18,17 @@ type Piece struct {
 type KingPos struct {
 	KCoord Coord
 	Ontop  bool
+	Col    bool
 }
 type KingNeighbors [3]Coord
 
-var (
-	TheTrueKing  = KingPos{Coord{2, 2}, true}
-	TheFalseKing = KingPos{Coord{6, 6}, false}
-)
+func InitKing(whichKing bool) KingPos {
+	if whichKing {
+		return KingPos{Coord{2, 2}, true, true}
+	} else {
+		return KingPos{Coord{6, 6}, false, false}
+	}
+}
 
 type Board [9]map[uint8]Piece
 
@@ -156,12 +160,13 @@ func (b *Board) getSpacesInRow(c Coord, ang uint8) (output []Coord, err error) {
 }
 
 // Accepts Coord and angle direction
-func (b *Board) GetLegalMoves(c Coord, check4Check bool) (output []Coord, err error) {
+func (b *Board) GetLegalMoves(c Coord, check4Check bool, myKing KingPos) (output []Coord, err error) {
 	output = []Coord{}
-	p, ok := b[c.X][c.Y]
-	if !ok {
+
+	if !posExists(c) {
 		return nil, fmt.Errorf("Error: Invalid position. (%d, %d) doesn't exist on board", c.X, c.Y)
 	}
+	p, _ := b[c.X][c.Y]
 
 	// Iterate over available angle of the piece.
 	for q := range uint8(6) {
@@ -190,15 +195,6 @@ func (b *Board) GetLegalMoves(c Coord, check4Check bool) (output []Coord, err er
 		// Check if each move would put the moving player in check
 		if check4Check {
 
-			// Get neighbors of king
-			kCol := b[c.X][c.Y].Col
-			var n KingNeighbors
-			if kCol {
-				n = TheTrueKing.getKingNeighbors()
-			} else {
-				n = TheFalseKing.getKingNeighbors()
-			}
-
 			keepIndex := 0
 			// Iterate over moves
 			for _, move := range moves {
@@ -208,7 +204,7 @@ func (b *Board) GetLegalMoves(c Coord, check4Check bool) (output []Coord, err er
 				// move piece
 				bClone[move.X][move.Y] = b[c.X][c.Y]
 
-				isCheck, err := bClone.Check(n, kCol)
+				isCheck, err := bClone.Check(myKing)
 				if err != nil {
 					return []Coord{}, err
 				}
@@ -228,13 +224,13 @@ func (b *Board) GetLegalMoves(c Coord, check4Check bool) (output []Coord, err er
 }
 
 // Accepts Coord of piece before and after, the movement angle, and the final Piece state.
-func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
+func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8, myKing KingPos) error {
 
 	if rotation > 5 {
 		return fmt.Errorf("invalid rotation %d: must be between 0 and 5", rotation)
 	}
 
-	moves, err := b.GetLegalMoves(c1, false)
+	moves, err := b.GetLegalMoves(c1, false, KingPos{})
 	if err != nil {
 		return err
 	}
@@ -244,15 +240,7 @@ func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 	}
 
 	// Check for check
-	kCol := b[c1.X][c1.Y].Col
-	var n KingNeighbors
-	if kCol {
-		n = TheTrueKing.getKingNeighbors()
-	} else {
-		n = TheFalseKing.getKingNeighbors()
-	}
-
-	isCheck, err := b.Check(n, kCol)
+	isCheck, err := b.Check(myKing)
 	if err != nil {
 		return err
 	}
@@ -268,13 +256,14 @@ func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8) error {
 }
 
 // Return whether or not the king is in check
-func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
+func (b *Board) Check(kP KingPos) (bool, error) {
+	kN := kP.getKingNeighbors()
 	// Trace from the king outward to find if threats are in his path.
 
 	// Iterate over the king's neighboring spaces
 	for _, space := range kN {
 		// Continue if an enemy piece sits in this space.
-		if b[space.X][space.Y].Ang != 0 && b[space.X][space.Y].Col != kCol {
+		if b[space.X][space.Y].Ang != 0 && b[space.X][space.Y].Col != kP.Col {
 			continue
 		}
 		// Iterate over all six directions
@@ -315,7 +304,7 @@ func (b *Board) Check(kN KingNeighbors, kCol bool) (bool, error) {
 				// If there is a piece here
 				if p.Ang != 0 {
 					// If it is an enemy piece pointing at the king
-					if p.Col != kCol && (p.Ang>>((a+3)%6))&1 == 1 { // get the ((a+3)%6)th bit (opposite direction of var a) and check if == 1
+					if p.Col != kP.Col && (p.Ang>>((a+3)%6))&1 == 1 { // get the ((a+3)%6)th bit (opposite direction of var a) and check if == 1
 						// Check situation found!
 						return true, nil
 					}
@@ -358,13 +347,13 @@ func (k *KingPos) GetLegalMoves(b *Board, check4Check bool) (moves []Coord, err 
 	keepIndex := 0
 	// Sort moves and only return valid ones
 	for _, move := range moves {
-		newK := KingPos{move, !k.Ontop}
+		newK := KingPos{move, !k.Ontop, k.Col}
 		newN := newK.getKingNeighbors()
 		// if this move lies on the board
 		if newN.validKingNeighbors() {
 			// if move results in check
 			if check4Check {
-				isCheck, err := b.Check(newN, !k.Ontop)
+				isCheck, err := b.Check(newK)
 				if err != nil {
 					return []Coord{}, err
 				}
@@ -379,13 +368,13 @@ func (k *KingPos) GetLegalMoves(b *Board, check4Check bool) (moves []Coord, err 
 	return moves[:keepIndex], nil
 }
 
-func (k1 *KingPos) Move(b *Board, c2 Coord, kCol bool) error {
+func (k1 *KingPos) Move(b *Board, c2 Coord) error {
 	// Get neighbors and validate
 	n1 := k1.getKingNeighbors()
 	if !n1.validKingNeighbors() {
 		return fmt.Errorf("Error: Invalid king location: (%v) not on board.", k1)
 	}
-	k2 := KingPos{c2, !k1.Ontop}
+	k2 := KingPos{c2, !k1.Ontop, k1.Col}
 	n2 := k2.getKingNeighbors()
 	if !n2.validKingNeighbors() {
 		return fmt.Errorf("Error: Invalid king location: (%v) not on board.", c2)
@@ -400,7 +389,7 @@ func (k1 *KingPos) Move(b *Board, c2 Coord, kCol bool) error {
 		return fmt.Errorf("Error: Invalid king move from (%v) to (%v). Move must be one of the following: %v", k1, c2, moves)
 	}
 
-	isCheck, err := b.Check(n2, kCol)
+	isCheck, err := b.Check(k2)
 	if err != nil {
 		return err
 	}
