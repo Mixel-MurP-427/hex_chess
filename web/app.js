@@ -25,13 +25,13 @@ let drag;
 let awaitingMove = false;
 
 function keyOf(position) {
-  return `${position.x},${position.y}`;
+  return `${position.X},${position.Y}`;
 }
 
 function pointFor(position) {
   return {
-    x: CENTER + (position.x - 4 + (position.y - 4) * 0.5) * SPACING,
-    y: CENTER - (position.y - 4) * SPACING * SQRT3_OVER_2,
+    X: CENTER + (position.X - 4 + (position.Y - 4) * 0.5) * SPACING,
+    Y: CENTER - (position.Y - 4) * SPACING * SQRT3_OVER_2,
   };
 }
 
@@ -43,25 +43,26 @@ function svgElement(name, attributes = {}) {
   return element;
 }
 
-function trianglePoints(position) {
-  const vertices = position.map(pointFor);
-  return vertices.map((vertex) => `${vertex.x},${vertex.y}`).join(" ");
+function getKingNeighbors({ KCoord, Ontop }) {
+  return Ontop
+    ? [KCoord, { X: KCoord.X + 1, Y: KCoord.Y }, { X: KCoord.X, Y: KCoord.Y + 1 }]
+    : [KCoord, { X: KCoord.X - 1, Y: KCoord.Y }, { X: KCoord.X, Y: KCoord.Y - 1 }];
 }
 
-// TODO replace this to work with KingPos instead of KingNeighbors
 function triangleCenter(position) {
-  const vertices = position.map(pointFor);
+  const vertices = getKingNeighbors(position);
+  const points = vertices.map(pointFor);
   return {
-    x: vertices.reduce((sum, vertex) => sum + vertex.x, 0) / 3,
-    y: vertices.reduce((sum, vertex) => sum + vertex.y, 0) / 3,
+    X: points.reduce((sum, point) => sum + point.X, 0) / 3,
+    Y: points.reduce((sum, point) => sum + point.Y, 0) / 3,
   };
 }
 
 function triangleMarkerPoints(position, scale) {
   const center = triangleCenter(position);
-  return position.map((vertex) => {
+  return getKingNeighbors(position).map((vertex) => {
     const point = pointFor(vertex);
-    return `${center.x + (point.x - center.x) * scale},${center.y + (point.y - center.y) * scale}`;
+    return `${center.X + (point.X - center.X) * scale},${center.Y + (point.Y - center.Y) * scale}`;
   }).join(" ");
 }
 
@@ -79,13 +80,13 @@ function setControlsEnabled(enabled) {
 
 function addBoardBackground() {
   const corners = [
-    { x: 0, y: 4 }, { x: 0, y: 8 }, { x: 4, y: 8 },
-    { x: 8, y: 4 }, { x: 8, y: 0 }, { x: 4, y: 0 },
+    { X: 0, Y: 4 }, { X: 0, Y: 8 }, { X: 4, Y: 8 },
+    { X: 8, Y: 4 }, { X: 8, Y: 0 }, { X: 4, Y: 0 },
   ];
   svg.append(svgElement("polygon", {
     points: corners.map((corner) => {
       const point = pointFor(corner);
-      return `${point.x},${point.y}`;
+      return `${point.X},${point.Y}`;
     }).join(" "),
     fill: "#f0ecdf",
   }));
@@ -97,19 +98,19 @@ function drawGrid() {
   const directions = [[1, -1], [1, 0], [0, 1]];
   for (const position of positions.values()) {
     for (const [dx, dy] of directions) {
-      const neighbor = { x: position.x + dx, y: position.y + dy };
+      const neighbor = { X: position.X + dx, Y: position.Y + dy };
       if (!positions.has(keyOf(neighbor))) continue;
       const start = pointFor(position);
       const end = pointFor(neighbor);
       svg.append(svgElement("line", {
-        x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: "grid-line",
+        x1: start.X, y1: start.Y, x2: end.X, y2: end.Y, class: "grid-line",
       }));
     }
   }
   for (const position of positions.values()) {
     const point = pointFor(position);
     svg.append(svgElement("circle", {
-      cx: point.x, cy: point.y, r: 4.2, class: "vertex", "data-key": keyOf(position),
+      cx: point.X, cy: point.Y, r: 4.2, class: "vertex", "data-key": keyOf(position),
     }));
   }
 }
@@ -118,7 +119,7 @@ function drawPiece(position, piece, isStaged = false) {
   const point = pointFor(position);
   const group = svgElement("g", {
     class: `piece ${piece.color ? "true" : "false"}`,
-    transform: `translate(${point.x} ${point.y})`,
+    transform: `translate(${point.X} ${point.Y})`,
   });
   if (isStaged) {
     group.append(svgElement("circle", { r: 19, class: "staged-outline" }));
@@ -140,7 +141,7 @@ function drawKing(position, color, isStaged = false) {
   const center = triangleCenter(position);
   const group = svgElement("g", {
     class: `king ${color ? "true" : "false"}`,
-    transform: `translate(${center.x} ${center.y})`,
+    transform: `translate(${center.X} ${center.Y})`,
   });
   group.append(svgElement("polygon", {
     points: triangleMarkerPoints(position, 0.46),
@@ -151,7 +152,7 @@ function drawKing(position, color, isStaged = false) {
       class: "staged-outline",
     }));
   }
-  const label = svgElement("text", { x: 0, y: 1 });
+  const label = svgElement("text", { X: 0, Y: 1 });
   label.textContent = "K";
   group.append(label);
   group.addEventListener("pointerdown", (event) => beginKingDrag(event, group, position, color));
@@ -175,8 +176,8 @@ function legalMovesFrom(position) {
 
 function svgPoint(event) {
   const point = svg.createSVGPoint();
-  point.x = event.clientX;
-  point.y = event.clientY;
+  point.X = event.clientX;
+  point.Y = event.clientY;
   return point.matrixTransform(svg.getScreenCTM().inverse());
 }
 
@@ -185,7 +186,7 @@ function nearestDestination(targets, point, centerFor) {
   let nearestDistance = Infinity;
   for (const target of targets) {
     const center = centerFor(target);
-    const distance = Math.hypot(center.x - point.x, center.y - point.y);
+    const distance = Math.hypot(center.X - point.X, center.Y - point.Y);
     if (distance < nearestDistance) {
       nearest = target;
       nearestDistance = distance;
@@ -205,9 +206,9 @@ function beginDrag(event, node, options) {
 function beginPieceDrag(event, node, position) {
   if (awaitingMove) return;
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(position));
-  if (!square || square.piece.angles.length === 0 || square.piece.color !== gameState.turn) return;
+  if (!square || square.piece.angles === 0 || square.piece.color !== gameState.turn) return;
   const targets = legalMovesFrom(position);
-  if (targets.length === 0) return;
+  if (targets === 0) return;
   beginDrag(event, node, { type: "move", from: position, targets });
   node.addEventListener("pointermove", moveDrag);
   node.addEventListener("pointerup", finishDrag, { once: true });
@@ -224,7 +225,7 @@ function beginKingDrag(event, node, position, color) {
   for (const target of targets) {
     const center = triangleCenter(target);
     svg.append(svgElement("circle", {
-      cx: center.x, cy: center.y, r: 14, class: "king-target",
+      cx: center.X, cy: center.Y, r: 14, class: "king-target",
     }));
   }
   beginDrag(event, node, { type: "king_move", targets });
@@ -238,7 +239,7 @@ function moveDrag(event) {
   const current = svgPoint(event);
   drag.node.setAttribute(
     "transform",
-    `${drag.baseTransform} translate(${current.x - drag.start.x} ${current.y - drag.start.y})`,
+    `${drag.baseTransform} translate(${current.X - drag.start.X} ${current.Y - drag.start.Y})`,
   );
 }
 

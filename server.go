@@ -173,7 +173,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			// 	}
 			// 	destinations = append(destinations, move)
 			// }
-			state.LegalMoves = append(state.LegalMoves, sourceMovesJSON{
+			state.LegalMoves = append(state.LegalMoves, sourceMovesJSON{ // TODO Is this bugged?
 				From: Coord{x, rawY},
 				To:   moves,
 			})
@@ -203,8 +203,8 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 	}
 
 	state.LegalKingMoves = []KingPos{}
-	for i, move := range cMoves {
-		state.LegalKingMoves[i] = KingPos{move, !activeKing.Ontop}
+	for _, move := range cMoves {
+		state.LegalKingMoves = append(state.LegalKingMoves, KingPos{move, !activeKing.Ontop})
 	}
 	return state, nil
 }
@@ -351,7 +351,11 @@ func (s *gameServer) removeClient(client *wsClient) {
 }
 
 func (s *gameServer) serveWebSocket(writer http.ResponseWriter, request *http.Request) {
-	conn, err := websocket.Upgrade(writer, request, nil, 1024, 1024)
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+	conn, err := upgrader.Upgrade(writer, request, nil)
 	if err != nil {
 		log.Printf("upgrade WebSocket connection: %v", err)
 		return
