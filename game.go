@@ -202,14 +202,15 @@ func (b *Board) GetLegalMoves(c Coord, check4Check bool, myKing KingPos) (output
 				// Clone board
 				bClone := b.clone()
 				// move piece
-				bClone[move.X][move.Y] = b[c.X][c.Y]
+				bClone[move.X][move.Y] = p
+				b[c.X][c.Y] = Piece{}
 
 				isCheck, err := bClone.Check(myKing)
 				if err != nil {
 					return []Coord{}, err
 				}
-				// Exclude moves that result in check
-				if isCheck {
+				// Include move if not check
+				if !isCheck {
 					moves[keepIndex] = move
 					keepIndex++
 				}
