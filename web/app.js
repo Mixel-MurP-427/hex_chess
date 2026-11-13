@@ -48,6 +48,7 @@ function trianglePoints(position) {
   return vertices.map((vertex) => `${vertex.x},${vertex.y}`).join(" ");
 }
 
+// TODO replace this to work with KingPos instead of KingNeighbors
 function triangleCenter(position) {
   const vertices = position.map(pointFor);
   return {
