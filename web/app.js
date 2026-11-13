@@ -1,3 +1,5 @@
+// TODO remove cursor grab feature for non-movable pieces
+
 const svg = document.querySelector("#board");
 const turnLabel = document.querySelector("#turn");
 const statusLabel = document.querySelector("#status");
@@ -118,7 +120,7 @@ function drawGrid() {
 function drawPiece(position, piece, isStaged = false) {
   const point = pointFor(position);
   const group = svgElement("g", {
-    class: `piece ${piece.color ? "true" : "false"}`,
+    class: `piece ${piece.Col ? "true" : "false"}`,
     transform: `translate(${point.X} ${point.Y})`,
   });
   if (isStaged) {
@@ -127,7 +129,7 @@ function drawPiece(position, piece, isStaged = false) {
   group.append(svgElement("circle", { r: 12 }));
   for (let angle = 0; angle < 6; angle++) {
     // Iterate over only the available angle of the piece.
-    if (((piece.angles>>angle)&1) == 0) {continue;}
+    if (((piece.Ang>>angle)&1) == 0) {continue;}
     const [dx, dy] = DIRECTIONS[angle];
     group.append(svgElement("line", {
       x1: 0, y1: 0, x2: dx * 23, y2: dy * 23, class: "ray",
@@ -206,7 +208,7 @@ function beginDrag(event, node, options) {
 function beginPieceDrag(event, node, position) {
   if (awaitingMove) return;
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(position));
-  if (!square || square.piece.angles === 0 || square.piece.color !== gameState.turn) return;
+  if (!square || square.piece.Ang === 0 || square.piece.Col !== gameState.turn) return;
   const targets = legalMovesFrom(position);
   if (targets === 0) return;
   beginDrag(event, node, { type: "move", from: position, targets });
@@ -239,7 +241,7 @@ function moveDrag(event) {
   const current = svgPoint(event);
   drag.node.setAttribute(
     "transform",
-    `${drag.baseTransform} translate(${current.X - drag.start.X} ${current.Y - drag.start.Y})`,
+    `${drag.baseTransform} translate(${current.x - drag.start.x} ${current.y - drag.start.y})`,
   );
 }
 
@@ -304,8 +306,8 @@ function stagedPiece() {
   if (!staged || staged.type !== "move") return undefined;
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(staged.from));
   if (!square) return undefined;
-  const angles = rotateLeft6Bit(square.piece.angles, staged.rotation);
-  return { color: square.piece.color, angles };
+  const angles = rotateLeft6Bit(square.piece.Ang, staged.rotation);
+  return { color: square.piece.Col, angles };
 }
 
 function render() {
@@ -313,7 +315,7 @@ function render() {
   svg.replaceChildren();
   drawGrid();
   for (const square of gameState.board) {
-    if (square.piece.angles === 0) continue;
+    if (square.piece.Ang === 0) continue;
     if (staged?.type === "move" &&
         (keyOf(square.position) === keyOf(staged.from) || keyOf(square.position) === keyOf(staged.to))) {
       continue;
@@ -344,6 +346,7 @@ function onMessage(event) {
     setStatus("The game server sent an unreadable message.", true);
     return;
   }
+  console.log(message);
   if (message.type === "error") {
     awaitingMove = false;
     setControlsEnabled(socket?.readyState === WebSocket.OPEN);
