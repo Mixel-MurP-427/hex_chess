@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"slices"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -123,39 +122,27 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 
 	activeKing := s.getActiveKing()
 
-	// Get available moves that each piece can make
-
+	// Populate square board
 	for xInt, row := range s.board {
 		x := uint8(xInt)
-		// ys is the list of y values in each x row
-		ys := make([]uint8, 0, len(row))
 		for y := range row {
-			ys = append(ys, y)
-		}
-		// Sorting is unnecessary because they already come sorted?
-		slices.Sort(ys)
-		// Iterate over all spaces on the board
-		for _, rawY := range ys {
-			piece := row[rawY]
-
+			piece := row[y]
 			// Add this space to the board state
 			state.Board = append(state.Board, squareJSON{
-				Position: Coord{x, rawY},
+				Position: Coord{x, y},
 				Piece:    Piece{piece.Col, piece.Ang},
 			})
-			// If the player is not allowed to manipulate this piece
-			if piece.Ang == 0 || piece.Col != s.turn {
-				continue
-			}
-			// Get legal moves for this piece
-			moves, err := s.board.GetLegalMoves(Coord{x, rawY}, true, activeKing)
-			if err != nil {
-				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
-			}
-			if len(moves) != 0 {
-				state.LegalMoves[fmt.Sprintf("%d,%d", x, rawY)] = moves
-			}
 		}
+	}
+	// Get all available moves
+	moves, err := s.board.GetAllMoves(activeKing)
+	if err != nil {
+		return stateJSON{}, fmt.Errorf("calculate legal moves: %w", err)
+	}
+
+	// JSONify
+	for key, val := range moves {
+		state.LegalMoves[fmt.Sprintf("%d,%d", key.X, key.Y)] = val
 	}
 
 	// Get king moves

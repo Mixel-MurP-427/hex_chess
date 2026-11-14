@@ -228,10 +228,6 @@ func (b *Board) GetLegalMoves(c Coord, check4Check bool, myKing KingPos) (output
 // Accepts Coord of piece before and after, the movement angle, and the final Piece state.
 func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8, myKing KingPos) error {
 
-	if rotation > 5 {
-		return fmt.Errorf("invalid rotation %d: must be between 0 and 5", rotation)
-	}
-
 	moves, err := b.GetLegalMoves(c1, false, KingPos{})
 	if err != nil {
 		return err
