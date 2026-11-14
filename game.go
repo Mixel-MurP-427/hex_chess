@@ -375,6 +375,8 @@ func (k *KingPos) GetLegalMoves(b *Board, check4Check bool) (moves []Coord, err 
 }
 
 func (k1 *KingPos) Move(b *Board, c2 Coord) error {
+
+	// TODO remove neighbor validation?
 	// Get neighbors and validate
 	n1 := k1.getKingNeighbors()
 	if !n1.validKingNeighbors() {

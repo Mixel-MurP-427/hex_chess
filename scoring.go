@@ -1,6 +1,9 @@
 package hexchess
 
-import "math/bits"
+import (
+	"fmt"
+	"math/bits"
+)
 
 const (
 	pScore     int8 = 1   // Each piece gets pScore points per angle it has.
@@ -9,6 +12,7 @@ const (
 )
 
 // TODO hash these constants and name the .gob after the hash.
+var gobName string = fmt.Sprintf("save_tree/main_save_%02x%02x%02x.gob", pScore, checkScore, mateScore)
 
 // A positive score favors the true player. Negative favors false.
 func (b *Board) getScore(color bool, king1, king2 KingPos) (score int8, err error) {
