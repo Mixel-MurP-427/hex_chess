@@ -21,20 +21,17 @@ type squareJSON struct {
 	Piece    Piece `json:"piece"`
 }
 
-type sourceMovesJSON struct {
-	From Coord   `json:"from"`
-	To   []Coord `json:"to"`
-}
+type sourceMovesJSON map[string][]Coord
 
 type stateJSON struct {
-	Type           string            `json:"type"`
-	Revision       uint64            `json:"revision"`
-	Board          []squareJSON      `json:"board"`
-	Turn           bool              `json:"turn"`
-	TrueKing       KingPos           `json:"trueKing"`
-	FalseKing      KingPos           `json:"falseKing"`
-	LegalMoves     []sourceMovesJSON `json:"legalMoves"`
-	LegalKingMoves []KingPos         `json:"legalKingMoves"`
+	Type           string          `json:"type"`
+	Revision       uint64          `json:"revision"`
+	Board          []squareJSON    `json:"board"`
+	Turn           bool            `json:"turn"`
+	TrueKing       KingPos         `json:"trueKing"`
+	FalseKing      KingPos         `json:"falseKing"`
+	LegalMoves     sourceMovesJSON `json:"legalMoves"`
+	LegalKingMoves []KingPos       `json:"legalKingMoves"`
 }
 
 type errorJSON struct {
@@ -118,7 +115,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		Turn:           s.turn,
 		TrueKing:       s.trueKing,
 		FalseKing:      s.falseKing,
-		LegalMoves:     make([]sourceMovesJSON, 0),
+		LegalMoves:     make(sourceMovesJSON, 11),
 		LegalKingMoves: make([]KingPos, 0),
 	}
 
@@ -137,14 +134,12 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		slices.Sort(ys)
 		// Iterate over all spaces on the board
 		for _, rawY := range ys {
-			// Why though?
 			piece := row[rawY]
-			angles := piece.Ang
 
 			// Add this space to the board state
 			state.Board = append(state.Board, squareJSON{
 				Position: Coord{x, rawY},
-				Piece:    Piece{piece.Col, angles},
+				Piece:    Piece{piece.Col, piece.Ang},
 			})
 			// If the player is not allowed to manipulate this piece
 			if piece.Ang == 0 || piece.Col != s.turn {
@@ -155,11 +150,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			if err != nil {
 				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
 			}
-
-			state.LegalMoves = append(state.LegalMoves, sourceMovesJSON{ // TODO Is this bugged?
-				From: Coord{x, rawY},
-				To:   moves,
-			})
+			state.LegalMoves[fmt.Sprintf("%d,%d", x, rawY)] = moves
 		}
 	}
 
@@ -193,6 +184,7 @@ func (s *gameServer) process(message clientMessage) error {
 		// Validation
 		if s.board[from.X][from.Y].Col != s.turn {
 			err = errors.New("you can only move a piece belonging to the active side")
+			fmt.Println(s.board, s.turn)
 			break
 		}
 

@@ -200,10 +200,11 @@ func (b *Board) GetLegalMoves(c Coord, check4Check bool, myKing KingPos) (output
 			for _, move := range moves {
 
 				// Clone board
+				// TODO be resourceful and only clone once instead of every iteration. Just reset the board later.
 				bClone := b.clone()
 				// move piece
 				bClone[move.X][move.Y] = p
-				b[c.X][c.Y] = Piece{}
+				bClone[c.X][c.Y] = Piece{}
 
 				isCheck, err := bClone.Check(myKing)
 				if err != nil {

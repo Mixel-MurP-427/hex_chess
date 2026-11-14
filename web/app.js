@@ -1,4 +1,4 @@
-// TODO remove cursor grab feature for non-movable pieces
+// TODO remove cursor grab feature for non-movable pieces. Don't even let it drag! (talking to you, blue!)
 
 const svg = document.querySelector("#board");
 const turnLabel = document.querySelector("#turn");
@@ -172,14 +172,10 @@ function clearTargets() {
   svg.querySelectorAll(".legal-target").forEach((vertex) => vertex.classList.remove("legal-target"));
 }
 
-function legalMovesFrom(position) {
-  return gameState.legalMoves.find((entry) => keyOf(entry.from) === keyOf(position))?.to ?? [];
-}
-
 function svgPoint(event) {
   const point = svg.createSVGPoint();
-  point.X = event.clientX;
-  point.Y = event.clientY;
+  point.x = event.clientX;
+  point.y = event.clientY;
   return point.matrixTransform(svg.getScreenCTM().inverse());
 }
 
@@ -188,7 +184,7 @@ function nearestDestination(targets, point, centerFor) {
   let nearestDistance = Infinity;
   for (const target of targets) {
     const center = centerFor(target);
-    const distance = Math.hypot(center.X - point.X, center.Y - point.Y);
+    const distance = Math.hypot(center.X - point.x, center.Y - point.y);
     if (distance < nearestDistance) {
       nearest = target;
       nearestDistance = distance;
@@ -209,7 +205,7 @@ function beginPieceDrag(event, node, position) {
   if (awaitingMove) return;
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(position));
   if (!square || square.piece.Ang === 0 || square.piece.Col !== gameState.turn) return;
-  const targets = legalMovesFrom(position);
+  const targets = gameState.legalMoves[`${position.X},${position.Y}`];
   if (targets === 0) return;
   beginDrag(event, node, { type: "move", from: position, targets });
   node.addEventListener("pointermove", moveDrag);
@@ -307,7 +303,7 @@ function stagedPiece() {
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(staged.from));
   if (!square) return undefined;
   const angles = rotateLeft6Bit(square.piece.Ang, staged.rotation);
-  return { color: square.piece.Col, angles };
+  return { Col: square.piece.Col, Ang: angles };
 }
 
 function render() {
