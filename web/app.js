@@ -203,10 +203,10 @@ function beginDrag(event, node, options) {
 
 function beginPieceDrag(event, node, position) {
   if (awaitingMove) return;
+  if (!(`${position.X},${position.Y}` in gameState.legalMoves)) return;
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(position));
   if (!square || square.piece.Ang === 0 || square.piece.Col !== gameState.turn) return;
   const targets = gameState.legalMoves[`${position.X},${position.Y}`];
-  if (targets.length === 0) return;
   beginDrag(event, node, { type: "move", from: position, targets });
   node.addEventListener("pointermove", moveDrag);
   node.addEventListener("pointerup", finishDrag, { once: true });
@@ -357,7 +357,9 @@ function onMessage(event) {
   gameState = message;
   if (revisionChanged) staged = undefined;
   render();
-  if (revisionChanged) {
+  if (gameState.mate) {
+    setStatus(`Checkmate! ${gameState.turn ? "Orange" : "Blue"} wins!`);
+  }else if (revisionChanged) {
     setStatus(`${gameState.turn ? "Blue" : "Orange"} to move.`);
   } else if (!staged) {
     setStatus("Drag a piece or king to a highlighted destination.");

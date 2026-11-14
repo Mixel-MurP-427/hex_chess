@@ -32,6 +32,7 @@ type stateJSON struct {
 	FalseKing      KingPos         `json:"falseKing"`
 	LegalMoves     sourceMovesJSON `json:"legalMoves"`
 	LegalKingMoves []KingPos       `json:"legalKingMoves"`
+	Mate           bool            `json:"mate"`
 }
 
 type errorJSON struct {
@@ -117,6 +118,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		FalseKing:      s.falseKing,
 		LegalMoves:     make(sourceMovesJSON, 11),
 		LegalKingMoves: make([]KingPos, 0),
+		Mate:           false,
 	}
 
 	activeKing := s.getActiveKing()
@@ -150,7 +152,9 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 			if err != nil {
 				return stateJSON{}, fmt.Errorf("calculate legal moves at (%d, %d): %w", x, rawY, err)
 			}
-			state.LegalMoves[fmt.Sprintf("%d,%d", x, rawY)] = moves
+			if len(moves) != 0 {
+				state.LegalMoves[fmt.Sprintf("%d,%d", x, rawY)] = moves
+			}
 		}
 	}
 
@@ -165,6 +169,12 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 	for _, move := range cMoves {
 		state.LegalKingMoves = append(state.LegalKingMoves, KingPos{move, !activeKing.Ontop, activeKing.Col})
 	}
+
+	// If checkmate
+	if len(state.LegalMoves) == 0 && len(state.LegalKingMoves) == 0 {
+		state.Mate = true
+	}
+
 	return state, nil
 }
 
