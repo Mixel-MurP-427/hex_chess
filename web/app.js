@@ -1,5 +1,3 @@
-// TODO remove cursor grab feature for non-movable pieces. Don't even let it drag! (talking to you, blue!)
-
 const svg = document.querySelector("#board");
 const turnLabel = document.querySelector("#turn");
 const statusLabel = document.querySelector("#status");
@@ -117,10 +115,10 @@ function drawGrid() {
   }
 }
 
-function drawPiece(position, piece, isStaged = false) {
+function drawPiece(position, piece, isStaged = false, draggable = false) {
   const point = pointFor(position);
   const group = svgElement("g", {
-    class: `piece ${piece.Col ? "true" : "false"}`,
+    class: `piece ${piece.Col ? "true" : "false"}${draggable ? " draggable" : ""}`,
     transform: `translate(${point.X} ${point.Y})`,
   });
   if (isStaged) {
@@ -139,10 +137,10 @@ function drawPiece(position, piece, isStaged = false) {
   svg.append(group);
 }
 
-function drawKing(position, color, isStaged = false) {
+function drawKing(position, color, isStaged = false, draggable = false) {
   const center = triangleCenter(position);
   const group = svgElement("g", {
-    class: `king ${color ? "true" : "false"}`,
+    class: `king ${color ? "true" : "false"}${draggable ? " draggable" : ""}`,
     transform: `translate(${center.X} ${center.Y})`,
   });
   group.append(svgElement("polygon", {
@@ -159,6 +157,20 @@ function drawKing(position, color, isStaged = false) {
   group.append(label);
   group.addEventListener("pointerdown", (event) => beginKingDrag(event, group, position, color));
   svg.append(group);
+}
+
+function canDragPiece(position, piece) {
+  if (awaitingMove || piece.Ang === 0 || piece.Col !== gameState.turn) return false;
+  const targets = gameState.legalMoves[`${position.X},${position.Y}`];
+  return Boolean(targets && targets.length > 0);
+}
+
+function canDragKing(position, color) {
+  if (awaitingMove || color !== gameState.turn) return false;
+  const currentKing = color ? gameState.trueKing : gameState.falseKing;
+  return keyOf(currentKing.KCoord) === keyOf(position.KCoord) &&
+    currentKing.Ontop === position.Ontop &&
+    gameState.legalKingMoves.length > 0;
 }
 
 function markTargets(targets) {
@@ -202,10 +214,8 @@ function beginDrag(event, node, options) {
 }
 
 function beginPieceDrag(event, node, position) {
-  if (awaitingMove) return;
-  if (!(`${position.X},${position.Y}` in gameState.legalMoves)) return;
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(position));
-  if (!square || square.piece.Ang === 0 || square.piece.Col !== gameState.turn) return;
+  if (!square || !canDragPiece(position, square.piece)) return;
   const targets = gameState.legalMoves[`${position.X},${position.Y}`];
   beginDrag(event, node, { type: "move", from: position, targets });
   node.addEventListener("pointermove", moveDrag);
@@ -214,13 +224,8 @@ function beginPieceDrag(event, node, position) {
 }
 
 function beginKingDrag(event, node, position, color) {
-  if (awaitingMove) return;
-  if (color !== gameState.turn) return;
-  const currentKing = color ? gameState.trueKing : gameState.falseKing;
-  if (keyOf(currentKing.KCoord) !== keyOf(position.KCoord) ||
-    currentKing.Ontop !== position.Ontop) return;
+  if (!canDragKing(position, color)) return;
   const targets = gameState.legalKingMoves;
-  if (targets.length === 0) return;
   for (const target of targets) {
     const center = triangleCenter(target);
     svg.append(svgElement("circle", {
@@ -317,7 +322,7 @@ function render() {
         (keyOf(square.position) === keyOf(staged.from) || keyOf(square.position) === keyOf(staged.to))) {
       continue;
     }
-    drawPiece(square.position, square.piece);
+    drawPiece(square.position, square.piece, false, canDragPiece(square.position, square.piece));
   }
   if (staged?.type === "move") {
     const piece = stagedPiece();
@@ -329,8 +334,18 @@ function render() {
   const falseKing = staged?.type === "king_move" && !gameState.turn
     ? staged.to
     : gameState.falseKing;
-  drawKing(trueKing, true, staged?.type === "king_move" && gameState.turn);
-  drawKing(falseKing, false, staged?.type === "king_move" && !gameState.turn);
+  drawKing(
+    trueKing,
+    true,
+    staged?.type === "king_move" && gameState.turn,
+    canDragKing(trueKing, true),
+  );
+  drawKing(
+    falseKing,
+    false,
+    staged?.type === "king_move" && !gameState.turn,
+    canDragKing(falseKing, false),
+  );
   turnLabel.textContent = gameState.turn ? "Blue to move" : "Orange to move";
   setControlsEnabled(socket?.readyState === WebSocket.OPEN);
 }
@@ -346,7 +361,8 @@ function onMessage(event) {
   console.log(message);
   if (message.type === "error") {
     awaitingMove = false;
-    setControlsEnabled(socket?.readyState === WebSocket.OPEN);
+    if (gameState) render();
+    else setControlsEnabled(socket?.readyState === WebSocket.OPEN);
     setStatus(message.message, true);
     return;
   }
@@ -414,7 +430,7 @@ sendButton.addEventListener("click", () => {
     return;
   }
   awaitingMove = true;
-  setControlsEnabled(false);
+  render();
   setStatus("Move sent. Waiting for the server…");
 });
 

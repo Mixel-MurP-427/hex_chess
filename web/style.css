@@ -188,13 +188,14 @@ button.send:hover:not(:disabled) {
   stroke-width: 3;
 }
 
-.piece {
+.piece.draggable,
+.king.draggable {
   cursor: grab;
   touch-action: none;
 }
 
-.piece:active,
-.king:active {
+.piece.draggable:active,
+.king.draggable:active {
   cursor: grabbing;
 }
 
@@ -219,8 +220,6 @@ button.send:hover:not(:disabled) {
 }
 
 .king {
-  cursor: grab;
-  touch-action: none;
   -webkit-user-select: none;
   -ms-user-select: none;
   user-select: none; 
