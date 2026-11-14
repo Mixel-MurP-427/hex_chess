@@ -184,7 +184,6 @@ func (s *gameServer) process(message clientMessage) error {
 		// Validation
 		if s.board[from.X][from.Y].Col != s.turn {
 			err = errors.New("you can only move a piece belonging to the active side")
-			fmt.Println(s.board, s.turn)
 			break
 		}
 
@@ -199,15 +198,10 @@ func (s *gameServer) process(message clientMessage) error {
 	// if a king was moved
 	case "king_move":
 
-		fmt.Println("It should edit the king now:")
-		fmt.Println(s)
-
 		// Try moving the king
 		if err = activeKing.Move(&s.board, message.King.KCoord); err != nil {
 			break
 		}
-
-		fmt.Println(s)
 
 		// Advance the game
 		s.turn = !s.turn

@@ -64,7 +64,7 @@ function triangleMarkerPoints(position, scale) {
   const center = triangleCenter(position);
   return getKingNeighbors(position).map((vertex) => {
     const point = pointFor(vertex);
-    return `${center.X + (point.X - center.X) * scale},${center.Y + (point.Y - center.Y) * scale}`;
+    return `${(point.X - center.X) * scale},${(point.Y - center.Y) * scale}`;
   }).join(" ");
 }
 
@@ -206,7 +206,7 @@ function beginPieceDrag(event, node, position) {
   const square = gameState.board.find((item) => keyOf(item.position) === keyOf(position));
   if (!square || square.piece.Ang === 0 || square.piece.Col !== gameState.turn) return;
   const targets = gameState.legalMoves[`${position.X},${position.Y}`];
-  if (targets === 0) return;
+  if (targets.length === 0) return;
   beginDrag(event, node, { type: "move", from: position, targets });
   node.addEventListener("pointermove", moveDrag);
   node.addEventListener("pointerup", finishDrag, { once: true });
@@ -217,7 +217,8 @@ function beginKingDrag(event, node, position, color) {
   if (awaitingMove) return;
   if (color !== gameState.turn) return;
   const currentKing = color ? gameState.trueKing : gameState.falseKing;
-  if (currentKing.map(keyOf).sort().join("|") !== position.map(keyOf).sort().join("|")) return;
+  if (keyOf(currentKing.KCoord) !== keyOf(position.KCoord) ||
+    currentKing.Ontop !== position.Ontop) return;
   const targets = gameState.legalKingMoves;
   if (targets.length === 0) return;
   for (const target of targets) {

@@ -212,7 +212,7 @@ button.send:hover:not(:disabled) {
 }
 
 .piece .ray {
-  stroke: #15202a;
+  stroke: #d649b8;
   stroke-width: 3;
   stroke-linecap: round;
   pointer-events: none;
@@ -221,6 +221,9 @@ button.send:hover:not(:disabled) {
 .king {
   cursor: grab;
   touch-action: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none; 
 }
 
 .king polygon {
@@ -237,7 +240,7 @@ button.send:hover:not(:disabled) {
 }
 
 .king text {
-  fill: #fff8e9;
+  fill: black;
   font-size: 18px;
   font-weight: 800;
   text-anchor: middle;
