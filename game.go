@@ -241,18 +241,26 @@ func (b *Board) Move(c1 Coord, c2 Coord, rotation uint8, myKing KingPos) error {
 		return fmt.Errorf("Error: Position (%d, %d) is not in the list of legal moves: %v", c2.X, c2.Y, moves)
 	}
 
-	// Check for check
-	isCheck, err := b.Check(myKing)
-	if err != nil {
-		return err
-	}
-	if isCheck {
-		return fmt.Errorf("Cannot move from (%v) to (%v) because it would result in check.", c1, c2)
-	}
-
+	oldPiece1 := b[c1.X][c1.Y]
+	oldPiece2 := b[c2.X][c2.Y]
 	// Set board with new move
 	b[c2.X][c2.Y] = rotatePiece(b[c1.X][c1.Y], rotation)
 	b[c1.X][c1.Y] = Piece{}
+
+	// Check for check
+	isCheck, err := b.Check(myKing)
+	if err != nil {
+		// Reset the board
+		b[c1.X][c1.Y] = oldPiece1
+		b[c2.X][c2.Y] = oldPiece2
+		return err
+	}
+	if isCheck {
+		// Reset the board
+		b[c1.X][c1.Y] = oldPiece1
+		b[c2.X][c2.Y] = oldPiece2
+		return fmt.Errorf("Cannot move from (%v) to (%v) because it would result in check.", c1, c2)
+	}
 
 	return nil
 }
