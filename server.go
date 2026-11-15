@@ -135,7 +135,7 @@ func (s *gameServer) stateLocked() (stateJSON, error) {
 		}
 	}
 	// Get all available moves
-	moves, err := s.board.GetAllMoves(activeKing)
+	moves, err := s.board.GetAllMoves(activeKing, &moveTable{})
 	if err != nil {
 		return stateJSON{}, fmt.Errorf("calculate legal moves: %w", err)
 	}

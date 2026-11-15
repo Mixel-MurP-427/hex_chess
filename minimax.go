@@ -8,8 +8,18 @@ import (
 	"strings"
 )
 
+type moveTable map[string]map[Coord][]Coord
+
 // Get available moves that each piece can make
-func (b *Board) GetAllMoves(theKing KingPos) (finalMoves map[Coord][]Coord, err error) {
+func (b *Board) GetAllMoves(theKing KingPos, saveTable *moveTable) (finalMoves map[Coord][]Coord, err error) {
+
+	// Check if this instance has already been computed
+	strKey := fmt.Sprint(state{theKing, KingPos{}, b})
+	allMoves, exists := (*saveTable)[strKey]
+	if exists {
+		return allMoves, nil
+	}
+
 	finalMoves = make(map[Coord][]Coord)
 
 	// Iterate over all spaces on the board
@@ -31,6 +41,7 @@ func (b *Board) GetAllMoves(theKing KingPos) (finalMoves map[Coord][]Coord, err 
 			}
 		}
 	}
+	(*saveTable)[strKey] = finalMoves
 	return finalMoves, nil
 }
 
@@ -178,9 +189,43 @@ func (data *botChoices) saveBotChoices(path string) error {
 	return nil
 }
 
+const moveTablePath = "hash_tables/GetAllMovesTable.go"
+
+func loadMoveTable(path string) (moveTable, error) {
+	var loaded = make(moveTable)
+	readFile, err := os.Open(path)
+	if err != nil {
+		return loaded, err
+	}
+	decoder := gob.NewDecoder(readFile)
+	if err = decoder.Decode(&loaded); err != nil {
+		return nil, err
+	}
+	if err := readFile.Close(); err != nil {
+		return nil, err
+	}
+	return loaded, nil
+}
+
+func (data *moveTable) saveMoveTable(path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	encoder := gob.NewEncoder(file)
+	if err = encoder.Encode(*data); err != nil {
+		return err
+	}
+	if err = file.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Recursive decision algorithm. Uses minimax with alpha beta pruning.
 func minimax(
 	childMap *memory, // Memory of past choice
+	pMovesMap *moveTable, // Table used by GetAllMoves function
 	isOrigin bool, // true if this is the first time minimax was called.
 	b *Board,
 	depth uint8, // Search depth in tree
@@ -214,7 +259,7 @@ func minimax(
 		}
 
 		maxEval := int8(math.MinInt8)
-		moves, err := b.GetAllMoves(maxKing)
+		moves, err := b.GetAllMoves(maxKing, pMovesMap)
 		if err != nil {
 			return 0, moveChoice{}, err
 		}
@@ -233,7 +278,7 @@ func minimax(
 					b[from.X][from.Y] = Piece{}
 
 					// Call minimax on new board state
-					eval, _, err := minimax(childMap, false, b, depth-1, alpha, beta, !who, false, maxKing, minKing)
+					eval, _, err := minimax(childMap, pMovesMap, false, b, depth-1, alpha, beta, !who, false, maxKing, minKing)
 					if err != nil {
 						return 0, moveChoice{}, err
 					}
@@ -264,7 +309,7 @@ func minimax(
 		}
 
 		for _, kMove := range kingMoves {
-			eval, _, err := minimax(childMap, false, b, depth-1, alpha, beta, !who, false, KingPos{kMove, !maxKing.Ontop, maxKing.Col}, minKing)
+			eval, _, err := minimax(childMap, pMovesMap, false, b, depth-1, alpha, beta, !who, false, KingPos{kMove, !maxKing.Ontop, maxKing.Col}, minKing)
 			if err != nil {
 				return 0, moveChoice{}, err
 			}
@@ -305,7 +350,7 @@ func minimax(
 		}
 
 		minEval := int8(math.MaxInt8)
-		moves, err := b.GetAllMoves(minKing)
+		moves, err := b.GetAllMoves(minKing, pMovesMap)
 		if err != nil {
 			return 0, moveChoice{}, err
 		}
@@ -324,7 +369,7 @@ func minimax(
 					b[from.X][from.Y] = Piece{}
 
 					// Call minimax on new board state
-					eval, _, err := minimax(childMap, false, b, depth-1, alpha, beta, !who, true, maxKing, minKing)
+					eval, _, err := minimax(childMap, pMovesMap, false, b, depth-1, alpha, beta, !who, true, maxKing, minKing)
 					if err != nil {
 						return 0, moveChoice{}, err
 					}
@@ -355,7 +400,7 @@ func minimax(
 		}
 
 		for _, kMove := range kingMoves {
-			eval, _, err := minimax(childMap, false, b, depth-1, alpha, beta, !who, true, maxKing, KingPos{kMove, !minKing.Ontop, minKing.Col})
+			eval, _, err := minimax(childMap, pMovesMap, false, b, depth-1, alpha, beta, !who, true, maxKing, KingPos{kMove, !minKing.Ontop, minKing.Col})
 			if err != nil {
 				return 0, moveChoice{}, err
 			}
@@ -381,7 +426,7 @@ func minimax(
 }
 
 // Call this one when you need a choice made
-func BotChoose(depth uint8, b *Board, maxKing, minKing KingPos, parentMap *botChoices) (moveChoice, error) {
+func BotChoose(depth uint8, b *Board, maxKing, minKing KingPos, parentMap *botChoices, pieceMovesMap *moveTable) (moveChoice, error) {
 
 	// Check if this instance has already been computed
 	strKey := string(depth+'0') + fmt.Sprint(state{maxKing, minKing, b})
@@ -392,7 +437,7 @@ func BotChoose(depth uint8, b *Board, maxKing, minKing KingPos, parentMap *botCh
 
 	familyMemory := make(memory)
 
-	_, choice, err := minimax(&familyMemory, true, b, depth, math.MinInt8, math.MaxInt8, maxKing.Col, true, maxKing, minKing)
+	_, choice, err := minimax(&familyMemory, pieceMovesMap, true, b, depth, math.MinInt8, math.MaxInt8, maxKing.Col, true, maxKing, minKing)
 	if err != nil {
 		return moveChoice{}, err
 	}

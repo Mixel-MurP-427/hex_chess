@@ -17,18 +17,20 @@ func TestBot(t *testing.T) {
 
 	theMemory, err := loadBotChoices(gobName)
 	fmt.Println(err)
-	// theMemory := memory{}
+
+	myMoveTable, err := loadMoveTable(moveTablePath)
 
 	//result, botChoice, err := minimax(&theMemory, true, &board, 3, math.MinInt8, math.MaxInt8, true, true, tK, fK)
-	choice, err := BotChoose(4, &board, tK, fK, &theMemory)
+	choice, err := BotChoose(5, &board, tK, fK, &theMemory, &myMoveTable)
 
 	fmt.Println(choice)
 	fmt.Println(err)
 	fmt.Println(theMemory.saveBotChoices(gobName))
+	fmt.Println(myMoveTable.saveMoveTable(moveTablePath))
 }
 
 func TestReadGob(t *testing.T) {
-	myObj, err := loadBotChoices(gobName)
+	myObj, err := loadMoveTable(moveTablePath)
 	fmt.Println(err)
 
 	// Convert struct to formatted JSON bytes
