@@ -11,8 +11,7 @@ const (
 	mateScore  int8 = 100 // Score when it ends in checkmate
 )
 
-// TODO hash these constants and name the .gob after the hash.
-var gobName string = fmt.Sprintf("save_tree/main_save_%02x%02x%02x.gob", pScore, checkScore, mateScore)
+var gobName string = fmt.Sprintf("hash_tables/minimax_%02x%02x%02x.gob", pScore, checkScore, mateScore)
 
 // A positive score favors the true player. Negative favors false.
 func (b *Board) getScore(color bool, king1, king2 KingPos) (score int8, err error) {

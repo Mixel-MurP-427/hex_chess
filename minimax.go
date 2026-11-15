@@ -127,7 +127,7 @@ func loadMemory(path string) (memory, error) {
 	var loaded = make(memory)
 	readFile, err := os.Open(path)
 	if err != nil {
-		panic(err)
+		return memory{}, err
 	}
 	decoder := gob.NewDecoder(readFile)
 	if err = decoder.Decode(&loaded); err != nil {
@@ -201,16 +201,24 @@ func minimax(
 		for from, tos := range moves {
 			for _, newMove := range tos {
 				for angle := range uint8(6) {
-					bClone := b.clone()
+					// Store state of spaces before move
+					oldFrom := b[from.X][from.Y]
+					oldTo := b[newMove.X][newMove.Y]
 					// Excecute the move
-					bClone[newMove.X][newMove.Y] = rotatePiece(bClone[from.X][from.Y], angle)
-					bClone[from.X][from.Y] = Piece{}
+					b[newMove.X][newMove.Y] = rotatePiece(b[from.X][from.Y], angle)
+					b[from.X][from.Y] = Piece{}
 
-					// Do scoring stuff
-					eval, _, err := minimax(superMap, false, &bClone, depth-1, alpha, beta, !who, false, maxKing, minKing)
+					// Call minimax on new board state
+					eval, _, err := minimax(superMap, false, b, depth-1, alpha, beta, !who, false, maxKing, minKing)
 					if err != nil {
 						return 0, moveChoice{}, err
 					}
+
+					// Move the pieces back
+					b[from.X][from.Y] = oldFrom
+					b[newMove.X][newMove.Y] = oldTo
+
+					// Calculate scoring
 					if eval > maxEval {
 						maxEval = eval
 						if isOrigin {
@@ -284,16 +292,24 @@ func minimax(
 		for from, tos := range moves {
 			for _, newMove := range tos {
 				for angle := range uint8(6) {
-					bClone := b.clone()
+					// Store state of spaces before move
+					oldFrom := b[from.X][from.Y]
+					oldTo := b[newMove.X][newMove.Y]
 					// Excecute the move
-					bClone[newMove.X][newMove.Y] = rotatePiece(bClone[from.X][from.Y], angle)
-					bClone[from.X][from.Y] = Piece{}
+					b[newMove.X][newMove.Y] = rotatePiece(b[from.X][from.Y], angle)
+					b[from.X][from.Y] = Piece{}
 
-					// Do scoring stuff
-					eval, _, err := minimax(superMap, false, &bClone, depth-1, alpha, beta, !who, true, maxKing, minKing)
+					// Call minimax on new board state
+					eval, _, err := minimax(superMap, false, b, depth-1, alpha, beta, !who, true, maxKing, minKing)
 					if err != nil {
 						return 0, moveChoice{}, err
 					}
+
+					// Move the pieces back
+					b[from.X][from.Y] = oldFrom
+					b[newMove.X][newMove.Y] = oldTo
+
+					// Calculate scoring
 					if eval < minEval {
 						minEval = eval
 						if isOrigin {
