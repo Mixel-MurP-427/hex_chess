@@ -2,7 +2,6 @@ package hexchess
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"testing"
 )
@@ -16,20 +15,20 @@ func TestBot(t *testing.T) {
 
 	fK := InitKing(false)
 
-	theMemory, err := loadMemory(gobName)
+	theMemory, err := loadBotChoices(gobName)
 	fmt.Println(err)
 	// theMemory := memory{}
 
-	result, botChoice, err := minimax(&theMemory, true, &board, 4, math.MinInt8, math.MaxInt8, true, true, tK, fK)
+	//result, botChoice, err := minimax(&theMemory, true, &board, 3, math.MinInt8, math.MaxInt8, true, true, tK, fK)
+	choice, err := BotChoose(4, &board, tK, fK, &theMemory)
 
-	fmt.Println(result)
-	fmt.Println(botChoice)
+	fmt.Println(choice)
 	fmt.Println(err)
-	fmt.Println(theMemory.saveMemory(gobName))
+	fmt.Println(theMemory.saveBotChoices(gobName))
 }
 
 func TestReadGob(t *testing.T) {
-	myObj, err := loadMemory(gobName)
+	myObj, err := loadBotChoices(gobName)
 	fmt.Println(err)
 
 	// Convert struct to formatted JSON bytes
@@ -43,4 +42,11 @@ func TestReadGob(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func TestSprint(t *testing.T) {
+	board := SetupBoard(false)
+	fmt.Println(&board)
+	fmt.Println(KingPos{Coord{6, 7}, true, true})
+	fmt.Println(state{KingPos{}, KingPos{}, &board})
 }

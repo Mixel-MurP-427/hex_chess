@@ -2,16 +2,17 @@ package hexchess
 
 import (
 	"fmt"
+	"math"
 	"math/bits"
 )
 
 const (
-	pScore     int8 = 1   // Each piece gets pScore points per angle it has.
-	checkScore int8 = 8   // Additional score if piece is in check
-	mateScore  int8 = 100 // Score when it ends in checkmate
+	pScore     int8 = 1            // Each piece gets pScore points per angle it has.
+	checkScore int8 = 7            // Additional score if piece is in check
+	mateScore  int8 = math.MaxInt8 // Score when it ends in checkmate
 )
 
-var gobName string = fmt.Sprintf("hash_tables/minimax_%02x%02x%02x.gob", pScore, checkScore, mateScore)
+var gobName string = fmt.Sprintf("hash_tables/BotChoices_%02x%02x%02x.gob", pScore, checkScore, mateScore)
 
 // A positive score favors the true player. Negative favors false.
 func (b *Board) getScore(color bool, king1, king2 KingPos) (score int8, err error) {

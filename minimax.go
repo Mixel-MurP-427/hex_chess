@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -38,9 +37,9 @@ func (b *Board) GetAllMoves(theKing KingPos) (finalMoves map[Coord][]Coord, err 
 // Setup for choice memory
 
 type state struct {
-	board     Board
 	trueKing  KingPos
 	falseKing KingPos
+	board     *Board
 }
 
 type moveChoice struct {
@@ -48,6 +47,8 @@ type moveChoice struct {
 	ToCoord   Coord
 	Rot       uint8
 }
+
+type botChoices map[string]moveChoice
 
 type conditions struct {
 	SearchDepth uint8
@@ -61,9 +62,8 @@ type outcome struct {
 
 type memory map[string]map[conditions]outcome
 
-// Stringer. Call fmt.Sprint(state) to convert it to a string.
-func (s state) String() string {
-	board := s.board
+func (board *Board) String() string {
+
 	var keys = [9][]uint8{
 		{4, 5, 6, 7, 8},
 		{3, 4, 5, 6, 7, 8},
@@ -77,69 +77,93 @@ func (s state) String() string {
 	}
 
 	var b strings.Builder
-
-	totalEntries := 0
-	for i := range board {
-		totalEntries += len(board[i])
-	}
-	b.Grow(56 + totalEntries*24 + 64) // TODO fix this
-	b.WriteString("s{b:[")
-	var number [3]byte
+	b.Grow(144)
+	b.WriteString("b[")
 
 	for x := range keys {
-		if x > 0 {
-			b.WriteByte(' ')
-		}
-		b.WriteString("m[")
+		b.WriteString("[")
 
-		first := true
 		for _, y := range keys[x] {
-			if !first {
-				b.WriteByte(' ')
-			}
-			first = false
 
-			b.Write(strconv.AppendUint(number[:0], uint64(y), 10))
-			b.WriteString(":{C:")
+			if board[x][y].Ang == 0 {
+				b.WriteString("  ")
 
-			if board[x][y].Col {
-				b.WriteByte('t')
 			} else {
-				b.WriteByte('f')
-			}
 
-			b.WriteString(" A:")
-			b.Write(strconv.AppendUint(number[:0], uint64(board[x][y].Ang), 10))
-			b.WriteByte('}')
+				if board[x][y].Col {
+					b.WriteByte('!')
+				} else {
+					b.WriteByte('"')
+				}
+				b.WriteByte('#' + board[x][y].Ang)
+
+			}
 		}
 		b.WriteByte(']')
 	}
+	b.WriteByte(']')
 
-	b.WriteString("] tK:{")
-	b.WriteString(fmt.Sprintf("%v", s.trueKing)) // TODO replace with something optimized and shorter in bytes
-	b.WriteString(" falseKing:")
-	b.WriteString(fmt.Sprintf("%v", s.falseKing))
-	b.WriteByte('}')
 	return b.String()
 }
 
-func loadMemory(path string) (memory, error) {
-	var loaded = make(memory)
+func (k KingPos) String() string {
+
+	var b strings.Builder
+	b.Grow(8)
+
+	b.WriteString("K{")
+
+	b.WriteByte('0' + k.KCoord.X)
+	b.WriteByte('0' + k.KCoord.Y)
+
+	if k.Ontop {
+		if k.Col {
+			b.WriteByte('T')
+		} else {
+			b.WriteByte('F')
+		}
+	} else {
+		if k.Col {
+			b.WriteByte('t')
+		} else {
+			b.WriteByte('f')
+		}
+	}
+
+	b.WriteByte('}')
+
+	return b.String()
+}
+
+func (s state) String() string {
+
+	var b strings.Builder
+	b.Grow(160)
+
+	b.WriteString(fmt.Sprint(s.trueKing))
+	b.WriteString(fmt.Sprint(s.falseKing))
+	b.WriteString(fmt.Sprint(s.board))
+
+	return b.String()
+}
+
+func loadBotChoices(path string) (botChoices, error) {
+	var loaded = make(botChoices)
 	readFile, err := os.Open(path)
 	if err != nil {
-		return memory{}, err
+		return loaded, err
 	}
 	decoder := gob.NewDecoder(readFile)
 	if err = decoder.Decode(&loaded); err != nil {
-		return memory{}, err
+		return nil, err
 	}
 	if err := readFile.Close(); err != nil {
-		return memory{}, err
+		return nil, err
 	}
 	return loaded, nil
 }
 
-func (data *memory) saveMemory(path string) error {
+func (data *botChoices) saveBotChoices(path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -156,7 +180,7 @@ func (data *memory) saveMemory(path string) error {
 
 // Recursive decision algorithm. Uses minimax with alpha beta pruning.
 func minimax(
-	superMap *memory, // Memory of past choice
+	childMap *memory, // Memory of past choice
 	isOrigin bool, // true if this is the first time minimax was called.
 	b *Board,
 	depth uint8, // Search depth in tree
@@ -166,9 +190,9 @@ func minimax(
 ) (int8, moveChoice, error) {
 
 	// Check if this instance has already been computed
-	strState := fmt.Sprint(state{*b, maxKing, minKing})
+	strState := fmt.Sprint(state{maxKing, minKing, b})
 	currentConditions := conditions{depth, isMaxingPlayer}
-	computedOutcome, exists := (*superMap)[strState][currentConditions]
+	computedOutcome, exists := (*childMap)[strState][currentConditions]
 	if exists {
 		return computedOutcome.Score, computedOutcome.Decision, nil
 	}
@@ -209,7 +233,7 @@ func minimax(
 					b[from.X][from.Y] = Piece{}
 
 					// Call minimax on new board state
-					eval, _, err := minimax(superMap, false, b, depth-1, alpha, beta, !who, false, maxKing, minKing)
+					eval, _, err := minimax(childMap, false, b, depth-1, alpha, beta, !who, false, maxKing, minKing)
 					if err != nil {
 						return 0, moveChoice{}, err
 					}
@@ -240,7 +264,7 @@ func minimax(
 		}
 
 		for _, kMove := range kingMoves {
-			eval, _, err := minimax(superMap, false, b, depth-1, alpha, beta, !who, false, KingPos{kMove, !maxKing.Ontop, maxKing.Col}, minKing)
+			eval, _, err := minimax(childMap, false, b, depth-1, alpha, beta, !who, false, KingPos{kMove, !maxKing.Ontop, maxKing.Col}, minKing)
 			if err != nil {
 				return 0, moveChoice{}, err
 			}
@@ -257,10 +281,10 @@ func minimax(
 			}
 		}
 
-		if _, exists = (*superMap)[strState]; !exists {
-			(*superMap)[strState] = make(map[conditions]outcome)
+		if _, exists = (*childMap)[strState]; !exists {
+			(*childMap)[strState] = make(map[conditions]outcome)
 		}
-		(*superMap)[strState][currentConditions] = outcome{maxEval, choice}
+		(*childMap)[strState][currentConditions] = outcome{maxEval, choice}
 		return maxEval, choice, nil
 
 	} else { // When not maxingPlayer
@@ -300,7 +324,7 @@ func minimax(
 					b[from.X][from.Y] = Piece{}
 
 					// Call minimax on new board state
-					eval, _, err := minimax(superMap, false, b, depth-1, alpha, beta, !who, true, maxKing, minKing)
+					eval, _, err := minimax(childMap, false, b, depth-1, alpha, beta, !who, true, maxKing, minKing)
 					if err != nil {
 						return 0, moveChoice{}, err
 					}
@@ -331,7 +355,7 @@ func minimax(
 		}
 
 		for _, kMove := range kingMoves {
-			eval, _, err := minimax(superMap, false, b, depth-1, alpha, beta, !who, true, maxKing, KingPos{kMove, !minKing.Ontop, minKing.Col})
+			eval, _, err := minimax(childMap, false, b, depth-1, alpha, beta, !who, true, maxKing, KingPos{kMove, !minKing.Ontop, minKing.Col})
 			if err != nil {
 				return 0, moveChoice{}, err
 			}
@@ -348,10 +372,32 @@ func minimax(
 			}
 		}
 
-		if _, exists = (*superMap)[strState]; !exists {
-			(*superMap)[strState] = make(map[conditions]outcome)
+		if _, exists = (*childMap)[strState]; !exists {
+			(*childMap)[strState] = make(map[conditions]outcome)
 		}
-		(*superMap)[strState][currentConditions] = outcome{minEval, choice}
+		(*childMap)[strState][currentConditions] = outcome{minEval, choice}
 		return minEval, choice, nil
 	}
+}
+
+// Call this one when you need a choice made
+func BotChoose(depth uint8, b *Board, maxKing, minKing KingPos, parentMap *botChoices) (moveChoice, error) {
+
+	// Check if this instance has already been computed
+	strKey := string(depth+'0') + fmt.Sprint(state{maxKing, minKing, b})
+	choice, exists := (*parentMap)[strKey]
+	if exists {
+		return choice, nil
+	}
+
+	familyMemory := make(memory)
+
+	_, choice, err := minimax(&familyMemory, true, b, depth, math.MinInt8, math.MaxInt8, maxKing.Col, true, maxKing, minKing)
+	if err != nil {
+		return moveChoice{}, err
+	}
+
+	// Save result to hash table
+	(*parentMap)[strKey] = choice
+	return choice, nil
 }
